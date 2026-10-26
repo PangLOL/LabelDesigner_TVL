@@ -2,14 +2,18 @@
 
 A batch label tool for sizing, previewing, and exporting labels at true millimetre scale. Print a 1:1 PDF to test the sizes, or export SVG for a Snapmaker 2.0.
 
-## Run
+## Open it
+
+The published page is [https://panglol.github.io/LabelDesigner_TVL/](https://panglol.github.io/LabelDesigner_TVL/). A push to `main` rebuilds it.
+
+To run a copy on this computer:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the local address Vite prints. `npm test` checks inheritance, packing, and SVG sizing. `npm run build` typechecks and builds the static app.
+Open the local address Vite prints. `npm test` checks inheritance, packing, and SVG sizing. `npm run build` typechecks and builds the static app. A GitHub Pages build sets `VITE_BASE` to `/LabelDesigner_TVL/` so fonts and scripts load from that path.
 
 The project saves in this browser. **File → Download project** writes a JSON file you can open later.
 
