@@ -1,0 +1,29 @@
+{
+  "name": "label-designer",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "jspdf": "^2.5.2",
+    "jszip": "^3.10.1",
+    "opentype.js": "^1.3.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "svg2pdf.js": "^2.5.0"
+  },
+  "devDependencies": {
+    "@types/opentype.js": "^1.3.8",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.6",
+    "vitest": "^3.0.0"
+  }
+}
