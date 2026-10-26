@@ -1,5 +1,5 @@
 import { load, parse, type Font } from "opentype.js";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { BUILTIN_FONTS, FALLBACK_FONT_ID } from "../model/fonts";
 import { createId } from "../model/id";
 import { deleteStoredFont, listStoredFonts, saveStoredFont } from "./fontDb";
@@ -12,8 +12,11 @@ export interface CustomFont {
 interface FontContextValue {
   fonts: Map<string, Font>;
   custom: CustomFont[];
+  pending: ReadonlySet<string>;
+  failed: ReadonlySet<string>;
   ready: boolean;
   error: string | null;
+  ensureFonts: (ids: readonly string[]) => void;
   addFontFile: (file: File) => Promise<void>;
   removeFont: (id: string) => Promise<void>;
 }
@@ -29,15 +32,61 @@ function fontTitle(font: Font, fileName: string): string {
 export function FontProvider({ children }: { children: ReactNode }) {
   const [fonts, setFonts] = useState<Map<string, Font>>(new Map());
   const [custom, setCustom] = useState<CustomFont[]>([]);
+  const [pending, setPending] = useState<Set<string>>(new Set());
+  const [failed, setFailed] = useState<Set<string>>(new Set());
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const started = useRef(new Set<string>());
+
+  const ensureFonts = useCallback((ids: readonly string[]) => {
+    for (const id of ids) {
+      const definition = BUILTIN_FONTS.find((font) => font.id === id);
+      if (!definition?.defer || started.current.has(id)) continue;
+      started.current.add(id);
+      setPending((current) => {
+        const next = new Set(current);
+        next.add(id);
+        return next;
+      });
+      load(definition.url)
+        .then((font) => {
+          setFonts((current) => {
+            const next = new Map(current);
+            next.set(id, font);
+            return next;
+          });
+          setFailed((current) => {
+            if (!current.has(id)) return current;
+            const next = new Set(current);
+            next.delete(id);
+            return next;
+          });
+        })
+        .catch(() => {
+          started.current.delete(id);
+          setFailed((current) => {
+            const next = new Set(current);
+            next.add(id);
+            return next;
+          });
+        })
+        .finally(() => {
+          setPending((current) => {
+            if (!current.has(id)) return current;
+            const next = new Set(current);
+            next.delete(id);
+            return next;
+          });
+        });
+    }
+  }, []);
 
   useEffect(() => {
     let cancel = false;
     (async () => {
       const map = new Map<string, Font>();
       await Promise.all(
-        BUILTIN_FONTS.map(async (definition) => {
+        BUILTIN_FONTS.filter((definition) => !definition.defer).map(async (definition) => {
           try {
             map.set(definition.id, await load(definition.url));
           } catch {
@@ -60,7 +109,11 @@ export function FontProvider({ children }: { children: ReactNode }) {
         /* IndexedDB can be unavailable. Built-in faces still work. */
       }
       if (cancel) return;
-      setFonts(map);
+      setFonts((current) => {
+        const next = new Map(current);
+        for (const [id, font] of map) next.set(id, font);
+        return next;
+      });
       setCustom(added);
       setReady(true);
       if (!map.has(FALLBACK_FONT_ID)) setError("Inter did not load, so labels cannot be drawn yet.");
@@ -108,8 +161,8 @@ export function FontProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ fonts, custom, ready, error, addFontFile, removeFont }),
-    [fonts, custom, ready, error, addFontFile, removeFont],
+    () => ({ fonts, custom, pending, failed, ready, error, ensureFonts, addFontFile, removeFont }),
+    [fonts, custom, pending, failed, ready, error, ensureFonts, addFontFile, removeFont],
   );
 
   return <FontContext.Provider value={value}>{children}</FontContext.Provider>;

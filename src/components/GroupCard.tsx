@@ -273,9 +273,17 @@ function LabelRow({
   plateOver: boolean;
 }) {
   const { dispatch, selected, toggleSelected } = useStore();
+  const { pending, failed } = useFonts();
   if (!resolvedLabel) return null;
   const resolved = resolvedLabel;
-  const issues = issuesFor(resolved, art, !fontsReady.has(resolved.typefaceId), sheetOver, plateOver);
+  const faceState = pending.has(resolved.typefaceId)
+    ? "loading"
+    : failed.has(resolved.typefaceId)
+      ? "failed"
+      : fontsReady.has(resolved.typefaceId)
+        ? "ready"
+        : "missing";
+  const issues = issuesFor(resolved, art, faceState, custom, sheetOver, plateOver);
   const on = selected.has(label.id);
 
   return (
@@ -429,10 +437,19 @@ function Measure({
   );
 }
 
-function issuesFor(label: ResolvedLabel, art: LabelArt | undefined, missingFont: boolean, sheetOver: boolean, plateOver: boolean): string[] {
+function issuesFor(
+  label: ResolvedLabel,
+  art: LabelArt | undefined,
+  faceState: "ready" | "loading" | "failed" | "missing",
+  custom: CustomFont[],
+  sheetOver: boolean,
+  plateOver: boolean,
+): string[] {
   const issues = labelIssues(label, art, false);
-  if (!art && label.text.trim()) issues.unshift("Typeface is not ready yet.");
-  else if (missingFont) issues.unshift("This typeface is not loaded. Inter is used instead.");
+  if (faceState === "loading") issues.unshift(`Loading ${fontName(label.typefaceId, custom)}…`);
+  else if (faceState === "failed") issues.unshift("This typeface did not load. Inter is used instead.");
+  else if (!art && label.text.trim()) issues.unshift("Typeface is not ready yet.");
+  else if (faceState === "missing") issues.unshift("This typeface is not loaded. Inter is used instead.");
   if (sheetOver) issues.push("Larger than the print sheet.");
   if (plateOver) issues.push("Larger than the build plate.");
   return issues;

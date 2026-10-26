@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BUILTIN_FONTS } from "../model/fonts";
+import { BUILTIN_FONTS, FONT_GROUPS } from "../model/fonts";
 import { clamp, formatMm } from "../model/format";
 import type { CustomFont } from "../state/fonts";
 
@@ -76,13 +76,15 @@ export function FontSelect({
   return (
     <select className="field face" aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>
       {!known && <option value={value}>Missing font</option>}
-      <optgroup label="Built in">
-        {BUILTIN_FONTS.map((font) => (
-          <option key={font.id} value={font.id}>
-            {font.name}
-          </option>
-        ))}
-      </optgroup>
+      {FONT_GROUPS.map((group) => (
+        <optgroup key={group} label={group}>
+          {BUILTIN_FONTS.filter((font) => font.group === group).map((font) => (
+            <option key={font.id} value={font.id}>
+              {font.name}
+            </option>
+          ))}
+        </optgroup>
+      ))}
       {custom.length > 0 && (
         <optgroup label="Added">
           {custom.map((font) => (
