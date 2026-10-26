@@ -4,7 +4,7 @@ A batch label tool for sizing, previewing, and exporting labels at true millimet
 
 ## Open it
 
-The published page is [https://panglol.github.io/LabelDesigner_TVL/](https://panglol.github.io/LabelDesigner_TVL/). A push to `main` rebuilds it.
+After GitHub Pages is set to **GitHub Actions** in the repository settings, the site is [https://panglol.github.io/LabelDesigner_TVL/](https://panglol.github.io/LabelDesigner_TVL/). A push to `main` or `cursor/label-designer-f72c` rebuilds it.
 
 To run a copy on this computer:
 
