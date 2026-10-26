@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { Edge } from "../types";
 import { clamp } from "../model/format";
 import { useStore } from "../state/store";
 import { useFonts } from "../state/fonts";
@@ -10,6 +11,9 @@ export function Editor() {
   const { custom } = useFonts();
   const ids = [...selected];
   const [bulkFace, setBulkFace] = useState("inter");
+  const [targetId, setTargetId] = useState("");
+  const targets = project.labels.filter((label) => !selected.has(label.id));
+  const target = targets.some((label) => label.id === targetId) ? targetId : "";
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -137,6 +141,44 @@ export function Editor() {
           >
             Follow groups
           </button>
+          <div className="attach-set">
+            <label>
+              Attach selected to
+              <select
+                className="field"
+                aria-label="Label that receives the selected labels"
+                value={target}
+                onChange={(event) => setTargetId(event.target.value)}
+              >
+                <option value="">Choose a label</option>
+                {targets.map((label) => {
+                  const group = project.groups.find((item) => item.id === label.groupId);
+                  return (
+                    <option key={label.id} value={label.id}>
+                      {(label.text || "Empty").slice(0, 40)}
+                      {group ? ` · ${group.name}` : ""}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+            <div className="attach" role="group" aria-label="Edge to attach on">
+              {(["top", "right", "bottom", "left"] as const satisfies readonly Edge[]).map((edge) => (
+                <button
+                  key={edge}
+                  type="button"
+                  disabled={!target}
+                  onClick={() => {
+                    if (!target) return;
+                    dispatch({ type: "combine", targetId: target, guestIds: ids, edge });
+                    setSelected(new Set([target]));
+                  }}
+                >
+                  {edge}
+                </button>
+              ))}
+            </div>
+          </div>
           <button type="button" onClick={() => dispatch({ type: "duplicateLabels", ids })}>
             Duplicate
           </button>

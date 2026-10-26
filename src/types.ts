@@ -1,5 +1,6 @@
 export type Align = "left" | "center" | "right";
 export type VAlign = "top" | "middle" | "bottom";
+export type Edge = "top" | "right" | "bottom" | "left";
 export type Follow = "group" | "custom";
 export type PaperPreset = "a4" | "letter" | "custom";
 export type MachinePreset = "a350" | "a250" | "a150" | "custom";
@@ -23,9 +24,31 @@ export interface Group {
   lineGap: number;
 }
 
+/** One row of lettering. A null size or alignment follows the label and the group. */
+export interface LabelLine {
+  text: string;
+  fontSize: number | null;
+  align: Align | null;
+}
+
+export interface LabelPiece {
+  id: string;
+  lines: LabelLine[];
+}
+
+export type LabelLayout =
+  | { kind: "piece"; pieceId: string }
+  | {
+      kind: "join";
+      axis: "horizontal" | "vertical";
+      /** `share` is the join-axis fraction. `cross` is this piece’s fraction of the other axis, so separating restores it. */
+      children: { share: number; cross: number; node: LabelLayout }[];
+    };
+
 export interface Label {
   id: string;
   groupId: string;
+  /** Reading-order summary of every piece. */
   text: string;
   width: number;
   height: number;
@@ -34,6 +57,8 @@ export interface Label {
   typefaceMode: Follow;
   fontSize: number;
   fontSizeMode: Follow;
+  pieces: LabelPiece[];
+  layout: LabelLayout;
 }
 
 export interface SheetSettings {

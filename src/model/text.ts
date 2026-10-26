@@ -1,7 +1,8 @@
 import { Path, type Font, type Glyph } from "opentype.js";
+import type { LabelLayout } from "../types";
 import { fontFor } from "./fonts";
 import { roundedRectPath, transformPath } from "./format";
-import type { ResolvedLabel } from "./resolve";
+import type { ResolvedLabel, ResolvedPiece } from "./resolve";
 
 export interface LabelArt {
   textPath: string;
@@ -61,51 +62,108 @@ function lineGeom(font: Font, text: string, fontSize: number, tracking: number, 
   return { width: x, path, top, bottom };
 }
 
-export function buildLabelArt(font: Font, label: ResolvedLabel): LabelArt {
-  const missing = new Set<string>();
-  const lines = label.text.length ? label.text.split("\n") : [];
-  const geoms = lines.map((line) => lineGeom(font, line, label.fontSize, label.tracking, missing));
-  const pitch = label.fontSize + label.lineGap;
-  const innerWidth = label.width - label.padding * 2;
+interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+function drawPiece(
+  font: Font,
+  piece: ResolvedPiece,
+  rect: Rect,
+  label: ResolvedLabel,
+  missing: Set<string>,
+): { path: string; overflow: boolean; inkTop: number | null; inkBottom: number | null } {
+  const lines = piece.lines.filter((line) => line.text.length > 0);
+  const geoms = lines.map((line) => ({ line, geom: lineGeom(font, line.text, line.fontSize, label.tracking, missing) }));
+  if (geoms.length === 0) return { path: "", overflow: false, inkTop: null, inkBottom: null };
 
   let overflow = false;
-  for (const geom of geoms) {
-    if (geom.width > innerWidth + 0.05) overflow = true;
+  for (const item of geoms) {
+    if (item.geom.width > rect.width + 0.05) overflow = true;
   }
 
-  let textPath = "";
-  let inkTop: number | null = null;
-  let inkBottom: number | null = null;
+  const baselines: number[] = [];
+  let cursor = 0;
+  geoms.forEach((item, index) => {
+    baselines.push(cursor);
+    cursor += item.line.fontSize + (index < geoms.length - 1 ? label.lineGap : 0);
+  });
+  const blockTop = geoms[0]?.geom.top ?? 0;
+  const last = geoms[geoms.length - 1];
+  const blockBottom = (baselines[baselines.length - 1] ?? 0) + (last?.geom.bottom ?? 0);
+  const blockHeight = blockBottom - blockTop;
+  if (blockHeight > rect.height + 0.05) overflow = true;
 
-  if (geoms.length > 0) {
-    const blockTop = geoms[0]?.top ?? 0;
-    const last = geoms[geoms.length - 1];
-    const blockBottom = (geoms.length - 1) * pitch + (last?.bottom ?? 0);
-    const blockHeight = blockBottom - blockTop;
-    if (blockHeight > label.height - label.padding * 2 + 0.05) overflow = true;
+  let shift = rect.y + (rect.height - blockHeight) / 2 - blockTop;
+  if (label.vAlign === "top") shift = rect.y - blockTop;
+  if (label.vAlign === "bottom") shift = rect.y + rect.height - blockBottom;
 
-    let shift = (label.height - blockHeight) / 2 - blockTop;
-    if (label.vAlign === "top") shift = label.padding - blockTop;
-    if (label.vAlign === "bottom") shift = label.height - label.padding - blockBottom;
+  let path = "";
+  geoms.forEach((item, index) => {
+    let x = rect.x + (rect.width - item.geom.width) / 2;
+    if (item.line.align === "left") x = rect.x;
+    if (item.line.align === "right") x = rect.x + rect.width - item.geom.width;
+    path += `${transformPath(item.geom.path.toPathData(3), x, shift + baselines[index], 1)} `;
+  });
+  return { path: path.trim(), overflow, inkTop: shift + blockTop, inkBottom: shift + blockBottom };
+}
 
-    geoms.forEach((geom, index) => {
-      let x = (label.width - geom.width) / 2;
-      if (label.align === "left") x = label.padding;
-      if (label.align === "right") x = label.width - label.padding - geom.width;
-      const baseline = shift + index * pitch;
-      textPath += `${transformPath(geom.path.toPathData(3), x, baseline, 1)} `;
-    });
-    inkTop = shift + blockTop;
-    inkBottom = shift + blockBottom;
+function walkLayout(
+  font: Font,
+  layout: LabelLayout,
+  rect: Rect,
+  pieces: Map<string, ResolvedPiece>,
+  label: ResolvedLabel,
+  missing: Set<string>,
+  into: { path: string[]; overflow: boolean; inkTop: number | null; inkBottom: number | null },
+): void {
+  if (rect.width <= 0 || rect.height <= 0) return;
+  if (layout.kind === "piece") {
+    const piece = pieces.get(layout.pieceId);
+    if (!piece) return;
+    const drawn = drawPiece(font, piece, rect, label, missing);
+    if (drawn.path) into.path.push(drawn.path);
+    if (drawn.overflow) into.overflow = true;
+    if (drawn.inkTop != null) into.inkTop = into.inkTop == null ? drawn.inkTop : Math.min(into.inkTop, drawn.inkTop);
+    if (drawn.inkBottom != null) into.inkBottom = into.inkBottom == null ? drawn.inkBottom : Math.max(into.inkBottom, drawn.inkBottom);
+    return;
   }
+  const total = layout.children.reduce((sum, child) => sum + child.share, 0) || 1;
+  let cursor = layout.axis === "horizontal" ? rect.x : rect.y;
+  for (const child of layout.children) {
+    const share = child.share / total;
+    const childRect =
+      layout.axis === "horizontal"
+        ? { x: cursor, y: rect.y, width: rect.width * share, height: rect.height }
+        : { x: rect.x, y: cursor, width: rect.width, height: rect.height * share };
+    if (layout.axis === "horizontal") cursor += childRect.width;
+    else cursor += childRect.height;
+    walkLayout(font, child.node, childRect, pieces, label, missing, into);
+  }
+}
 
+export function buildLabelArt(font: Font, label: ResolvedLabel): LabelArt {
+  const missing = new Set<string>();
+  const pad = Math.min(label.padding, Math.min(label.width, label.height) / 2);
+  const content: Rect = {
+    x: pad,
+    y: pad,
+    width: Math.max(0, label.width - pad * 2),
+    height: Math.max(0, label.height - pad * 2),
+  };
+  const into = { path: [] as string[], overflow: false, inkTop: null as number | null, inkBottom: null as number | null };
+  const pieces = new Map((label.pieces ?? []).map((piece) => [piece.id, piece]));
+  if (label.layout) walkLayout(font, label.layout, content, pieces, label, missing, into);
   return {
-    textPath: textPath.trim(),
+    textPath: into.path.join(" "),
     borderPath: roundedRectPath(label.width, label.height, label.radius),
-    overflow,
+    overflow: into.overflow,
     missing: [...missing],
-    inkTop,
-    inkBottom,
+    inkTop: into.inkTop,
+    inkBottom: into.inkBottom,
   };
 }
 

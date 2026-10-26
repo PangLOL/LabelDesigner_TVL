@@ -1,8 +1,8 @@
-import type { Align, Follow, Group, Label, MachinePreset, OutlineMode, PaperPreset, Project, SheetSettings, PlateSettings, VAlign } from "../types";
+import type { Align, Follow, Group, Label, LabelLayout, LabelLine, LabelPiece, MachinePreset, OutlineMode, PaperPreset, Project, SheetSettings, PlateSettings, VAlign } from "../types";
 import { MACHINES, PAPER } from "../types";
+import { labelSummary, linesFromText, singleLayout } from "./compose";
 import { clamp } from "./format";
 import { createId } from "./id";
-import { sampleProject } from "./sample";
 
 const FOLLOWS = new Set<Follow>(["group", "custom"]);
 const ALIGNS = new Set<Align>(["left", "center", "right"]);
@@ -53,13 +53,60 @@ function sanitizeGroup(value: unknown): Group | null {
   };
 }
 
+function sanitizeLine(value: unknown): LabelLine | null {
+  if (!isRecord(value)) return null;
+  return {
+    text: str(value.text, "").slice(0, 80),
+    fontSize: numOrNull(value.fontSize, 0.8, 400),
+    align: typeof value.align === "string" && ALIGNS.has(value.align as Align) ? (value.align as Align) : null,
+  };
+}
+
+function sanitizeLayout(value: unknown, pieceIds: Set<string>): LabelLayout | null {
+  if (!isRecord(value)) return null;
+  if (value.kind === "piece" && typeof value.pieceId === "string" && pieceIds.has(value.pieceId)) {
+    return { kind: "piece", pieceId: value.pieceId };
+  }
+  if (value.kind !== "join" || (value.axis !== "horizontal" && value.axis !== "vertical") || !Array.isArray(value.children)) return null;
+  const children = value.children.flatMap((child) => {
+    if (!isRecord(child)) return [];
+    const node = sanitizeLayout(child.node, pieceIds);
+    const share = num(child.share, 0, 0, 1);
+    const cross = num(child.cross, 1, 0, 1);
+    return node ? [{ share, cross, node }] : [];
+  });
+  if (children.length < 2) return null;
+  const total = children.reduce((sum, child) => sum + child.share, 0);
+  const safe = total > 0 ? children : children.map((child) => ({ ...child, share: 1 / children.length }));
+  const scale = total > 0 ? total : 1;
+  return { kind: "join", axis: value.axis, children: safe.map((child) => ({ share: child.share / scale, cross: child.cross, node: child.node })) };
+}
+
+function compositionFromText(text: string): { pieces: LabelPiece[]; layout: LabelLayout } {
+  const id = createId();
+  return { pieces: [{ id, lines: linesFromText(text) }], layout: singleLayout(id) };
+}
+
 function sanitizeLabel(value: unknown, groupIds: Set<string>): Label | null {
   if (!isRecord(value) || typeof value.id !== "string" || typeof value.groupId !== "string") return null;
   if (!groupIds.has(value.groupId)) return null;
-  return {
+  const fallback = compositionFromText(str(value.text, "").slice(0, 200));
+  let pieces: LabelPiece[] = [];
+  if (Array.isArray(value.pieces)) {
+    pieces = value.pieces.flatMap((piece) => {
+      if (!isRecord(piece) || typeof piece.id !== "string" || !Array.isArray(piece.lines)) return [];
+      const lines = piece.lines.map(sanitizeLine).filter((line): line is LabelLine => line !== null).slice(0, 12);
+      if (lines.length === 0) return [];
+      return [{ id: piece.id, lines }];
+    });
+  }
+  const pieceIds = new Set(pieces.map((piece) => piece.id));
+  const layout = pieces.length > 0 ? sanitizeLayout(value.layout, pieceIds) : null;
+  const composition = layout ? { pieces, layout } : fallback;
+  const label: Label = {
     id: value.id,
     groupId: value.groupId,
-    text: str(value.text, "").slice(0, 200),
+    text: "",
     width: num(value.width, 40, 1, 2000),
     height: num(value.height, 12, 1, 2000),
     heightMode: oneOf(value.heightMode, FOLLOWS, "group"),
@@ -67,7 +114,11 @@ function sanitizeLabel(value: unknown, groupIds: Set<string>): Label | null {
     typefaceMode: oneOf(value.typefaceMode, FOLLOWS, "group"),
     fontSize: num(value.fontSize, 5, 0.8, 400),
     fontSizeMode: oneOf(value.fontSizeMode, FOLLOWS, "group"),
+    pieces: composition.pieces,
+    layout: composition.layout,
   };
+  label.text = labelSummary(label.pieces, label.layout);
+  return label;
 }
 
 export function sanitizeProject(value: unknown): Project | null {
@@ -113,10 +164,9 @@ export function sanitizeProject(value: unknown): Project | null {
 
 export function blankProject(): Project {
   const id = createId();
-  const base = sampleProject();
   return {
-    ...base,
-    name: "Untitled labels",
+    version: 1,
+    name: "Labels",
     masterHeight: null,
     groups: [
       {
@@ -134,7 +184,23 @@ export function blankProject(): Project {
       },
     ],
     labels: [],
-    sheet: { ...base.sheet },
-    plate: { ...base.plate },
+    sheet: {
+      preset: "a4",
+      width: PAPER.a4.width,
+      height: PAPER.a4.height,
+      margin: 14,
+      gap: 6,
+      showDimensions: true,
+      showCalibration: true,
+    },
+    plate: {
+      preset: "a350",
+      width: MACHINES.a350.width,
+      height: MACHINES.a350.height,
+      margin: 8,
+      gap: 4,
+      outline: true,
+      outlineMode: "cut",
+    },
   };
 }

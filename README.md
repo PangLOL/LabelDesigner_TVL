@@ -15,7 +15,7 @@ npm run dev
 
 Open the local address Vite prints. `npm test` checks inheritance, packing, and SVG sizing. `npm run build` typechecks and builds the static app. A GitHub Pages build sets `VITE_BASE` to `/LabelDesigner_TVL/` so fonts and scripts load from that path.
 
-The project saves in this browser. **File → Download project** writes a JSON file you can open later.
+The project saves in this browser and starts empty. **File → Download project** writes a JSON file you can open later. **New** clears the labels.
 
 ## How the sizes work
 
@@ -36,6 +36,10 @@ HELLO, WORLD, 70
 Text comes first. Then width. Then an optional height, which is stored as that label’s own height. Commas or tabs both work.
 
 Padding, alignment, tracking, corner radius, and line gap belong to the group, under **Inset, alignment, corners**.
+
+A label’s text can use line breaks. Each line has its own font height and can sit left, center, or right. **Label** on a line follows that label’s font height. **Group** on a line follows the group alignment. **Own** keeps the line’s setting when the label or group changes.
+
+Select one or more labels, choose another label in **Attach selected to**, then choose **top**, **right**, **bottom**, or **left**. They become one label with one cut outline. Top and bottom stack. Left and right sit side by side. The joined size adds the pieces along that edge and uses the larger size across it. Changing the outer width or height scales the pieces. **Separate** undoes the last join and gives each part its own outline again. Do this twice when two rows sit beside one larger line.
 
 ## Preview
 

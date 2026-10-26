@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { Group, Label } from "../types";
+import type { Group, Label, LabelLine, LabelPiece } from "../types";
+import { orderedPieceIds, pieceText } from "../model/compose";
 import { fontName } from "../model/fonts";
 import { formatMm } from "../model/format";
 import { parseLabelList } from "../model/format";
-import type { ResolvedLabel } from "../model/resolve";
+import type { ResolvedLabel, ResolvedLine } from "../model/resolve";
 import { capHeightMm, labelIssues, type LabelArt } from "../model/text";
 import { groupSwatch } from "../palette";
 import { useArtwork } from "../state/artwork";
@@ -285,6 +286,12 @@ function LabelRow({
         : "missing";
   const issues = issuesFor(resolved, art, faceState, custom, sheetOver, plateOver);
   const on = selected.has(label.id);
+  const joined = label.layout.kind === "join";
+  const pieces = orderedPieceIds(label.layout).flatMap((id) => {
+    const piece = label.pieces.find((item) => item.id === id);
+    return piece ? [piece] : [];
+  });
+  const only = pieces.length === 1 ? pieces[0] : undefined;
 
   return (
     <div className={on ? "label-block on" : "label-block"} data-row-id={label.id}>
@@ -301,16 +308,20 @@ function LabelRow({
           checked={on}
           onChange={(event) => toggleSelected(label.id, event.nativeEvent instanceof MouseEvent && event.nativeEvent.shiftKey, true)}
         />
-        <textarea
-          className="field text"
-          rows={Math.min(3, Math.max(1, label.text.split("\n").length))}
-          aria-label="Label text"
-          value={label.text}
-          onFocus={() => {
-            if (!on) toggleSelected(label.id, false, false);
-          }}
-          onChange={(event) => dispatch({ type: "updateLabel", id: label.id, patch: { text: event.target.value } })}
-        />
+        {only ? (
+          <textarea
+            className="field text"
+            rows={Math.min(4, Math.max(1, only.lines.length))}
+            aria-label="Label text"
+            value={pieceText(only)}
+            onFocus={() => {
+              if (!on) toggleSelected(label.id, false, false);
+            }}
+            onChange={(event) => dispatch({ type: "setPieceText", labelId: label.id, pieceId: only.id, text: event.target.value })}
+          />
+        ) : (
+          <p className="summary">{label.text || "Combined label"}</p>
+        )}
         <div className="metric">
           <MmInput
             label={`Width of ${label.text || "label"}`}
@@ -401,7 +412,138 @@ function LabelRow({
           </button>
         </div>
       </div>
+      <div className="composition">
+        {joined && (
+          <div className="piece-head">
+            <span>One cut outline. Separate undoes the last join.</span>
+            <button type="button" className="text-btn" onClick={() => dispatch({ type: "separate", id: label.id })}>
+              Separate
+            </button>
+          </div>
+        )}
+        {pieces.map((piece, pieceIndex) => (
+          <div key={piece.id} className="piece">
+            {joined && (
+              <textarea
+                className="field text"
+                rows={Math.min(4, Math.max(1, piece.lines.length))}
+                aria-label={`Text of part ${pieceIndex + 1}`}
+                value={pieceText(piece)}
+                onFocus={() => {
+                  if (!on) toggleSelected(label.id, false, false);
+                }}
+                onChange={(event) => dispatch({ type: "setPieceText", labelId: label.id, pieceId: piece.id, text: event.target.value })}
+              />
+            )}
+            {piece.lines.map((line, index) => {
+              const resolvedLine = resolved.pieces.find((item) => item.id === piece.id)?.lines[index];
+              if (!resolvedLine) return null;
+              return (
+                <LineEdit
+                  key={`${piece.id}-${index}`}
+                  labelId={label.id}
+                  piece={piece}
+                  line={line}
+                  index={index}
+                  resolvedLine={resolvedLine}
+                  partLabel={joined ? `Part ${pieceIndex + 1}, line ${index + 1}` : `Line ${index + 1}`}
+                />
+              );
+            })}
+          </div>
+        ))}
+      </div>
       {issues.length > 0 && <p className="issue">{issues.join(" ")}</p>}
+    </div>
+  );
+}
+
+function LineEdit({
+  labelId,
+  piece,
+  line,
+  index,
+  resolvedLine,
+  partLabel,
+}: {
+  labelId: string;
+  piece: LabelPiece;
+  line: LabelLine;
+  index: number;
+  resolvedLine: ResolvedLine;
+  partLabel: string;
+}) {
+  const { dispatch } = useStore();
+  const ownSize = line.fontSize != null;
+  const ownAlign = line.align != null;
+  return (
+    <div className="line-edit">
+      <span className="line-name" title={line.text}>
+        {partLabel}
+      </span>
+      <div className="follow">
+        {ownSize ? (
+          <MmInput
+            label={`${partLabel} font height`}
+            value={line.fontSize ?? resolvedLine.fontSize}
+            min={0.8}
+            max={400}
+            onChange={(fontSize) =>
+              dispatch({ type: "updateLine", labelId, pieceId: piece.id, index, patch: { fontSize } })
+            }
+          />
+        ) : (
+          <span className="follow-read">{formatMm(resolvedLine.fontSize)}</span>
+        )}
+        <span className="unit">mm</span>
+        <FollowButton
+          linked={!ownSize}
+          linkedText="Label"
+          label={ownSize ? "Using this line’s font height. Follow the label again." : "Using the label font height. Set this line alone."}
+          onToggle={() =>
+            dispatch({
+              type: "updateLine",
+              labelId,
+              pieceId: piece.id,
+              index,
+              patch: { fontSize: ownSize ? null : resolvedLine.fontSize },
+            })
+          }
+        />
+      </div>
+      <div className="segment" role="group" aria-label={`${partLabel} alignment`}>
+        {(["left", "center", "right"] as const).map((align) => (
+          <button
+            key={align}
+            type="button"
+            aria-pressed={resolvedLine.align === align}
+            onClick={() =>
+              dispatch({
+                type: "updateLine",
+                labelId,
+                pieceId: piece.id,
+                index,
+                patch: { align: line.align === align ? null : align },
+              })
+            }
+          >
+            {align.slice(0, 1).toUpperCase()}
+          </button>
+        ))}
+      </div>
+      <FollowButton
+        linked={!ownAlign}
+        label={ownAlign ? "Using this line’s alignment. Follow the group again." : "Using the group alignment. Set this line alone."}
+        onToggle={() =>
+          dispatch({
+            type: "updateLine",
+            labelId,
+            pieceId: piece.id,
+            index,
+            patch: { align: ownAlign ? null : resolvedLine.align },
+          })
+        }
+      />
     </div>
   );
 }

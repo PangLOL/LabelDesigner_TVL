@@ -2,7 +2,6 @@ import { useCallback, useRef, useState } from "react";
 import type { SvgUnit } from "../types";
 import { formatMm } from "../model/format";
 import { blankProject, sanitizeProject } from "../model/project";
-import { sampleProject } from "../model/sample";
 import { buildSvgZip, downloadBlob, projectSlug } from "../export/download";
 import { svgPagesToPdf } from "../export/pdf";
 import { labelDownloadName, renderLabelSvg, renderPlateSvg, renderSheetSvg, withXml } from "../export/svg";
@@ -120,17 +119,6 @@ export function TopBar() {
       >
         New
       </button>
-      <button
-        type="button"
-        className="btn"
-        onClick={() => {
-          if (!window.confirm("Replace this project with the workshop sample?")) return;
-          dispatch({ type: "replace", project: sampleProject() });
-          setSelected(new Set());
-        }}
-      >
-        Sample
-      </button>
       <details className="pop">
         <summary className="btn">File</summary>
         <div className="pop-panel">
@@ -153,7 +141,7 @@ export function TopBar() {
       <details className="pop">
         <summary className="btn">Fonts</summary>
         <div className="pop-panel font-panel">
-          <p>Built-in faces cover Latin. Add a TTF, OTF, or WOFF for Chinese or a brand face.</p>
+          <p>Built-in faces cover Latin and Traditional Chinese. Add a TTF, OTF, or WOFF for another face.</p>
           <button type="button" className="btn" onClick={() => fontRef.current?.click()}>
             Add font file
           </button>
