@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import type { SvgUnit } from "../types";
 import { formatMm } from "../model/format";
 import { blankProject, sanitizeProject } from "../model/project";
-import { projectToCsv } from "../export/csv";
+import { isLabelCsv, projectFromCsv, projectToCsv } from "../export/csv";
 import { buildSvgZip, downloadBlob, projectSlug } from "../export/download";
 import { svgPagesToPdf } from "../export/pdf";
 import { labelDownloadName, renderLabelSvg, renderPlateSvg, renderSheetSvg, withXml } from "../export/svg";
@@ -140,7 +140,7 @@ export function TopBar() {
       <details className="pop">
         <summary className="btn">File</summary>
         <div className="pop-panel file-panel">
-          <p>Save writes a project file. Open project reads it back, including on another day. CSV is the same parameters for a spreadsheet. This browser keeps the current project until you click New.</p>
+          <p>Save writes a project file. Open project reads that file or a CSV, including a .txt copy of the spreadsheet. The file window lists every file, so a CSV is not greyed out on a Mac. This browser keeps the current project until you click New.</p>
           <button type="button" onClick={saveProject}>
             Save project
           </button>
@@ -181,14 +181,15 @@ export function TopBar() {
       <input
         ref={jsonRef}
         type="file"
-        accept="application/json,.json"
         hidden
         onChange={async (event) => {
           const file = event.target.files?.[0];
           event.target.value = "";
           if (!file) return;
           try {
-            const next = sanitizeProject(JSON.parse(await file.text()));
+            const text = await file.text();
+            const csv = isLabelCsv(text) || file.name.toLowerCase().endsWith(".csv");
+            const next = csv ? projectFromCsv(text, custom) : sanitizeProject(JSON.parse(text));
             if (!next) {
               setMessage("That file is not a label project.");
               return;

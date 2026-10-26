@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { parse } from "opentype.js";
 import { describe, expect, it } from "vitest";
 import { LUBAN_UNITS_PER_MM } from "../types";
-import { projectToCsv } from "../export/csv";
+import { isLabelCsv, projectFromCsv, projectToCsv } from "../export/csv";
 import { renderLabelSvg, renderPlateSvg, renderSheetSvg } from "../export/svg";
 import { BUILTIN_FONTS } from "./fonts";
 import { formatNum, parseLabelList, roundedRectPath, transformPath } from "./format";
@@ -10,7 +10,7 @@ import { paginate } from "./layout";
 import { blankProject } from "./project";
 import { reducer } from "./reducer";
 import { resolveAll } from "./resolve";
-import { joinLayouts, joinedSize, separateParts } from "./compose";
+import { joinLayouts, joinedSize, orderedPieceIds, separateParts } from "./compose";
 import { buildLabelArt } from "./text";
 import type { ResolvedLabel } from "./resolve";
 import type { Label } from "../types";
@@ -238,6 +238,79 @@ describe("project csv", () => {
     expect(csv).toContain("4 | ");
     expect(csv).toContain("40");
     expect(csv).toContain("210 x 297");
+    expect(isLabelCsv(csv)).toBe(true);
+    expect(isLabelCsv("\uFEFFrecord;group\r\n")).toBe(true);
+    expect(isLabelCsv('{"version":1}')).toBe(false);
+  });
+
+  it("opens a csv on another computer, including an older sheet and a combined label", () => {
+    let project = blankProject();
+    project = { ...project, name: "Door, west" };
+    project = reducer(project, { type: "setMasterHeight", height: 18 });
+    const groupId = project.groups[0].id;
+    project = reducer(project, { type: "updateGroup", id: groupId, patch: { padding: 2, align: "left", masterTypefaceId: "noto-sans-cjk-tc-bold" } });
+    project = reducer(project, { type: "addLabel", groupId });
+    project = reducer(project, { type: "addLabel", groupId });
+    const [first, second] = project.labels;
+    project = reducer(project, { type: "setPieceText", labelId: first.id, pieceId: first.pieces[0].id, text: "UP\nDOWN" });
+    project = reducer(project, { type: "updateLine", labelId: first.id, pieceId: first.pieces[0].id, index: 0, patch: { fontSize: 4, align: "left" } });
+    project = reducer(project, { type: "updateLabel", id: second.id, patch: { width: 22, text: "SIDE" } });
+    project = reducer(project, { type: "setPieceText", labelId: second.id, pieceId: second.pieces[0].id, text: "SIDE" });
+    project = reducer(project, { type: "combine", targetId: first.id, guestIds: [second.id], edge: "right" });
+    project = reducer(project, { type: "setSheet", patch: { margin: 11, gap: 5, showCalibration: false } });
+    project = reducer(project, { type: "setPlate", patch: { margin: 9, outlineMode: "engrave" } });
+    const custom = [{ id: "shop-face", name: "Shop Font" }];
+
+    const restored = projectFromCsv(projectToCsv(project, custom), custom);
+    expect(restored?.name).toBe("Door, west");
+    expect(restored?.masterHeight).toBe(18);
+    expect(restored?.groups[0]).toMatchObject({
+      name: "Group 1",
+      masterHeight: 18,
+      masterTypefaceId: "noto-sans-cjk-tc-bold",
+      padding: 2,
+      align: "left",
+    });
+    expect(restored?.sheet).toMatchObject({ preset: "a4", width: 210, height: 297, margin: 11, gap: 5, showCalibration: false });
+    expect(restored?.plate).toMatchObject({ preset: "a350", margin: 9, outlineMode: "engrave" });
+    expect(restored?.labels).toHaveLength(1);
+    const label = restored?.labels[0];
+    expect(label?.width).toBe(62);
+    expect(label?.height).toBe(18);
+    expect(label?.layout.kind).toBe("join");
+    const pieceText = (id: string) => label?.pieces.find((piece) => piece.id === id)?.lines.map((line) => [line.text, line.fontSize, line.align]);
+    const ids = label ? orderedPieceIds(label.layout) : [];
+    expect(pieceText(ids[0] ?? "")).toEqual([
+      ["UP", 4, "left"],
+      ["DOWN", null, null],
+    ]);
+    expect(pieceText(ids[1] ?? "")).toEqual([["SIDE", null, null]]);
+    const parts = label ? separateParts(label) : null;
+    expect(parts?.[0]?.width).toBeCloseTo(40, 2);
+    expect(parts?.[1]?.width).toBeCloseTo(22, 2);
+
+    const legacy = [
+      "record,group,text,width_mm,height_mm,height_from,typeface,typeface_from,font_height_mm,font_height_from,lines,line_font_mm,line_align,sheet_mm,plate_mm,master_height_mm",
+      "project,,Pump room,,,,,,,,,,,210 x 297,230 x 250,",
+      "group,Power,,,20,,Noto Sans CJK TC Bold,,12,,,,,,",
+      "label,Power,充電座,45,20,group,Noto Sans CJK TC Bold,group,12,group,充電座 | 座,,,",
+    ].join("\r\n");
+    const opened = projectFromCsv(legacy);
+    expect(opened?.name).toBe("Pump room");
+    expect(opened?.sheet.preset).toBe("a4");
+    expect(opened?.sheet.margin).toBe(14);
+    expect(opened?.plate).toMatchObject({ preset: "a250", width: 230, height: 250, margin: 8 });
+    expect(opened?.labels[0]).toMatchObject({
+      width: 45,
+      height: 20,
+      heightMode: "group",
+      typefaceId: "noto-sans-cjk-tc-bold",
+      typefaceMode: "group",
+      fontSize: 12,
+      fontSizeMode: "group",
+    });
+    expect(opened?.labels[0].pieces[0].lines.map((line) => line.text)).toEqual(["充電座", "座"]);
+    expect(opened?.groups[0].masterFontSize).toBe(12);
   });
 });
 
