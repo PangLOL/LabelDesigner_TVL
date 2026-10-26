@@ -2,10 +2,9 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type D
 import type { Project } from "../types";
 import { labelsInGroupOrder } from "../model/resolve";
 import { reducer, type Action } from "../model/reducer";
-import { sampleProject } from "../model/sample";
-import { sanitizeProject } from "../model/project";
+import { blankProject, sanitizeProject } from "../model/project";
 
-const STORAGE_KEY = "label-designer.project.v1";
+const STORAGE_KEY = "label-designer.project.v2";
 
 interface StoreValue {
   project: Project;
@@ -19,11 +18,12 @@ const StoreContext = createContext<StoreValue | null>(null);
 
 function loadProject(): Project {
   try {
+    localStorage.removeItem("label-designer.project.v1");
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return sampleProject();
-    return sanitizeProject(JSON.parse(raw)) ?? sampleProject();
+    if (!raw) return blankProject();
+    return sanitizeProject(JSON.parse(raw)) ?? blankProject();
   } catch {
-    return sampleProject();
+    return blankProject();
   }
 }
 

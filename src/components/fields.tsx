@@ -98,7 +98,19 @@ export function FontSelect({
   );
 }
 
-export function FollowButton({ linked, onToggle, label }: { linked: boolean; onToggle: () => void; label: string }) {
+export function FollowButton({
+  linked,
+  onToggle,
+  label,
+  linkedText = "Group",
+  ownText = "Own",
+}: {
+  linked: boolean;
+  onToggle: () => void;
+  label: string;
+  linkedText?: string;
+  ownText?: string;
+}) {
   return (
     <button
       type="button"
@@ -107,7 +119,7 @@ export function FollowButton({ linked, onToggle, label }: { linked: boolean; onT
       aria-label={label}
       onClick={onToggle}
     >
-      {linked ? "Group" : "Own"}
+      {linked ? linkedText : ownText}
     </button>
   );
 }

@@ -284,6 +284,36 @@ textarea.field {
   color: var(--warn);
   font-size: 12px;
 }
+.summary {
+  margin: 0;
+  min-height: 30px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.composition {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 4px 8px 28px;
+}
+.piece-head, .line-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: center;
+}
+.piece-head { color: var(--muted); font-size: 12px; }
+.piece { display: flex; flex-direction: column; gap: 4px; max-width: 640px; }
+.line-name {
+  min-width: 72px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.line-edit .segment button { padding: 0 7px; }
+.attach-set { display: flex; flex-direction: column; gap: 4px; }
+.attach { display: flex; gap: 4px; align-items: end; }
+.attach button { text-transform: capitalize; }
+.attach button:disabled { opacity: 0.4; }
 .empty { padding: 8px 4px 4px; }
 
 .group-add { margin-top: 8px; }

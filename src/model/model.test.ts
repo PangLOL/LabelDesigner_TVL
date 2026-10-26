@@ -6,11 +6,13 @@ import { renderLabelSvg, renderPlateSvg, renderSheetSvg } from "../export/svg";
 import { BUILTIN_FONTS } from "./fonts";
 import { formatNum, parseLabelList, roundedRectPath, transformPath } from "./format";
 import { paginate } from "./layout";
+import { blankProject } from "./project";
 import { reducer } from "./reducer";
 import { resolveAll } from "./resolve";
-import { sampleProject } from "./sample";
+import { joinLayouts, joinedSize, separateParts } from "./compose";
 import { buildLabelArt } from "./text";
 import type { ResolvedLabel } from "./resolve";
+import type { Label } from "../types";
 import type { Font } from "opentype.js";
 
 function loadFont(file: string): Font {
@@ -22,6 +24,7 @@ const inter = loadFont("public/fonts/inter-semibold.woff");
 const mono = loadFont("public/fonts/plex-mono.woff");
 
 function box(partial: Partial<ResolvedLabel> & Pick<ResolvedLabel, "text" | "width" | "height" | "fontSize">): ResolvedLabel {
+  const lines = partial.pieces?.[0]?.lines ?? partial.text.split("\n").map((text) => ({ text, fontSize: partial.fontSize, align: partial.align ?? "center" as const }));
   return {
     id: partial.id ?? "id",
     groupId: "g",
@@ -38,9 +41,28 @@ function box(partial: Partial<ResolvedLabel> & Pick<ResolvedLabel, "text" | "wid
     radius: partial.radius ?? 0,
     tracking: partial.tracking ?? 0,
     lineGap: partial.lineGap ?? 0.4,
+    pieces: partial.pieces ?? [{ id: "p", lines }],
+    layout: partial.layout ?? { kind: "piece", pieceId: "p" },
     heightSource: "label",
     typefaceSource: "label",
     fontSizeSource: "label",
+  };
+}
+
+function leaf(id: string, text: string, width: number, height: number): Label {
+  return {
+    id,
+    groupId: "g",
+    text,
+    width,
+    height,
+    heightMode: "custom",
+    typefaceId: "inter",
+    typefaceMode: "custom",
+    fontSize: 5,
+    fontSizeMode: "custom",
+    pieces: [{ id: `${id}-piece`, lines: [{ text, fontSize: null, align: null }] }],
+    layout: { kind: "piece", pieceId: `${id}-piece` },
   };
 }
 
@@ -81,13 +103,47 @@ describe("parseLabelList", () => {
 
 describe("inheritance", () => {
   it("uses the project height, then the group, then the label", () => {
-    const project = sampleProject();
+    const grouped = leaf("on", "ON", 32, 12);
+    grouped.heightMode = "group";
+    grouped.fontSizeMode = "group";
+    grouped.typefaceMode = "group";
+    const ownHeight = leaf("hold", "HOLD", 40, 18);
+    ownHeight.fontSizeMode = "group";
+    const ownFace = leaf("fuse", "FUSE", 40, 14);
+    ownFace.heightMode = "group";
+    ownFace.typefaceMode = "custom";
+    ownFace.typefaceId = "inter-semibold";
+    ownFace.fontSizeMode = "custom";
+    ownFace.fontSize = 4.5;
+    const project = {
+      version: 1 as const,
+      name: "Test",
+      masterHeight: null,
+      groups: [
+        {
+          id: "g",
+          name: "Group",
+          masterHeight: 12,
+          masterTypefaceId: "inter-semibold",
+          masterFontSize: 5,
+          padding: 1.4,
+          align: "center" as const,
+          vAlign: "middle" as const,
+          radius: 0,
+          tracking: 0,
+          lineGap: 0.4,
+        },
+      ],
+      labels: [grouped, ownHeight, ownFace],
+      sheet: { preset: "a4" as const, width: 210, height: 297, margin: 14, gap: 6, showDimensions: true, showCalibration: true },
+      plate: { preset: "a350" as const, width: 320, height: 350, margin: 8, gap: 4, outline: true, outlineMode: "cut" as const },
+    };
     const on = resolveAll(project).find((label) => label.id === "on");
     const hold = resolveAll(project).find((label) => label.id === "hold");
     const fuse = resolveAll(project).find((label) => label.id === "fuse");
     expect(on).toMatchObject({ height: 12, heightSource: "group", fontSize: 5, typefaceId: "inter-semibold" });
     expect(hold).toMatchObject({ height: 18, heightSource: "label", fontSizeSource: "group" });
-    expect(fuse).toMatchObject({ height: 14, typefaceId: "inter-semibold", typefaceSource: "label", fontSize: 4.5 });
+    expect(fuse).toMatchObject({ height: 12, typefaceId: "inter-semibold", typefaceSource: "label", fontSize: 4.5 });
 
     const locked = reducer(project, { type: "setMasterHeight", height: 10 });
     const again = resolveAll(locked);
@@ -145,9 +201,95 @@ describe("label art", () => {
   });
 
   it("flags a line that is wider than the label", () => {
-    const emergency = resolveAll(sampleProject()).find((label) => label.id === "emergency");
-    expect(emergency).toBeTruthy();
-    expect(buildLabelArt(inter, emergency!).overflow).toBe(true);
+    const emergency = box({ text: "EMERGENCY", width: 26, height: 12, fontSize: 5, padding: 1.4 });
+    expect(buildLabelArt(inter, emergency).overflow).toBe(true);
+  });
+
+  it("gives each line its own height inside one label", () => {
+    const label = box({
+      text: "UP\nFUNCTION\nDOWN",
+      width: 140,
+      height: 50,
+      fontSize: 5,
+      padding: 1,
+      pieces: [
+        {
+          id: "p",
+          lines: [
+            { text: "UP", fontSize: 4, align: "center" },
+            { text: "FUNCTION", fontSize: 12, align: "center" },
+            { text: "DOWN", fontSize: 4, align: "center" },
+          ],
+        },
+      ],
+    });
+    const art = buildLabelArt(inter, label);
+    expect(art.missing).toEqual([]);
+    expect(art.overflow).toBe(false);
+    expect((art.inkBottom ?? 0) - (art.inkTop ?? 0)).toBeGreaterThan(12);
+  });
+});
+
+describe("combined labels", () => {
+  it("joins on an edge and separates back to the same outer sizes", () => {
+    const host = leaf("host", "功能", 40, 30);
+    const guest = leaf("guest", "上", 40, 12);
+    const size = joinedSize(host, guest, "top");
+    const joined: Label = {
+      ...host,
+      width: size.width,
+      height: size.height,
+      pieces: [...host.pieces, ...guest.pieces],
+      layout: joinLayouts(host.layout, guest.layout, host.height, guest.height, host.width, guest.width, "top"),
+    };
+    expect(joined.width).toBe(40);
+    expect(joined.height).toBe(42);
+    const parts = separateParts(joined);
+    expect(parts?.map((part) => [part.id, part.width, part.height])).toEqual([
+      [expect.any(String), 40, 12],
+      ["host", 40, 30],
+    ]);
+  });
+
+  it("restores each piece after two joins, including a shorter cross size", () => {
+    let project = blankProject();
+    const groupId = project.groups[0].id;
+    project = reducer(project, { type: "addLabel", groupId });
+    project = reducer(project, { type: "addLabel", groupId });
+    const [up, down] = project.labels;
+    project = reducer(project, { type: "updateLabel", id: up.id, patch: { width: 20, height: 8, heightMode: "custom" } });
+    project = reducer(project, { type: "updateLabel", id: down.id, patch: { width: 20, height: 8, heightMode: "custom" } });
+    project = reducer(project, { type: "setPieceText", labelId: up.id, pieceId: up.pieces[0].id, text: "UP" });
+    project = reducer(project, { type: "setPieceText", labelId: down.id, pieceId: down.pieces[0].id, text: "DOWN" });
+    project = reducer(project, { type: "updateLine", labelId: up.id, pieceId: up.pieces[0].id, index: 0, patch: { fontSize: 4, align: "left" } });
+    project = reducer(project, { type: "combine", targetId: up.id, guestIds: [down.id], edge: "bottom" });
+    const stack = project.labels[0];
+    expect(stack).toMatchObject({ id: up.id, width: 20, height: 16, text: "UP · DOWN" });
+
+    project = reducer(project, { type: "addLabel", groupId });
+    const fn = project.labels.find((label) => label.id !== up.id);
+    if (!fn) throw new Error("missing function label");
+    project = reducer(project, { type: "updateLabel", id: fn.id, patch: { width: 30, height: 24, heightMode: "custom" } });
+    project = reducer(project, { type: "setPieceText", labelId: fn.id, pieceId: fn.pieces[0].id, text: "FUNCTION" });
+    project = reducer(project, { type: "updateLine", labelId: fn.id, pieceId: fn.pieces[0].id, index: 0, patch: { fontSize: 12 } });
+    project = reducer(project, { type: "combine", targetId: fn.id, guestIds: [up.id], edge: "left" });
+    expect(project.labels).toHaveLength(1);
+    expect(project.labels[0]).toMatchObject({ id: fn.id, width: 50, height: 24 });
+
+    const split = reducer(project, { type: "separate", id: fn.id });
+    expect(split.labels.map((label) => [label.width, label.height, label.text])).toEqual([
+      [20, 16, "UP · DOWN"],
+      [30, 24, "FUNCTION"],
+    ]);
+    expect(split.labels[1]?.id).toBe(fn.id);
+    const again = reducer(split, { type: "separate", id: split.labels[0].id });
+    expect(again.labels.map((label) => [label.text, label.width, label.height])).toEqual([
+      ["UP", 20, 8],
+      ["DOWN", 20, 8],
+      ["FUNCTION", 30, 24],
+    ]);
+    expect(again.labels[0]?.pieces[0]?.lines[0]).toMatchObject({ fontSize: 4, align: "left" });
+    expect(again.labels[2]?.pieces[0]?.lines[0]?.fontSize).toBe(12);
   });
 });
 

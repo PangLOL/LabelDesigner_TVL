@@ -1,7 +1,18 @@
-import type { Group, Label, Project } from "../types";
+import type { Align, Group, Label, LabelLayout, Project } from "../types";
 
 export type HeightSource = "project" | "group" | "label";
 export type FieldSource = "group" | "label";
+
+export interface ResolvedLine {
+  text: string;
+  fontSize: number;
+  align: Align;
+}
+
+export interface ResolvedPiece {
+  id: string;
+  lines: ResolvedLine[];
+}
 
 export interface ResolvedLabel {
   id: string;
@@ -19,6 +30,8 @@ export interface ResolvedLabel {
   radius: number;
   tracking: number;
   lineGap: number;
+  pieces: ResolvedPiece[];
+  layout: LabelLayout;
   heightSource: HeightSource;
   typefaceSource: FieldSource;
   fontSizeSource: FieldSource;
@@ -71,6 +84,7 @@ export function resolveLabel(project: Project, label: Label): ResolvedLabel {
     fontSizeSource = "group";
   }
 
+  const align = group?.align ?? "center";
   return {
     id: label.id,
     groupId: label.groupId,
@@ -82,11 +96,20 @@ export function resolveLabel(project: Project, label: Label): ResolvedLabel {
     typefaceId,
     fontSize,
     padding: group?.padding ?? 1.2,
-    align: group?.align ?? "center",
+    align,
     vAlign: group?.vAlign ?? "middle",
     radius: group?.radius ?? 0,
     tracking: group?.tracking ?? 0,
     lineGap: group?.lineGap ?? 0.4,
+    pieces: label.pieces.map((piece) => ({
+      id: piece.id,
+      lines: piece.lines.map((line) => ({
+        text: line.text,
+        fontSize: line.fontSize ?? fontSize,
+        align: line.align ?? align,
+      })),
+    })),
+    layout: label.layout,
     heightSource,
     typefaceSource,
     fontSizeSource,
