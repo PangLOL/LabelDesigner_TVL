@@ -17,3 +17,22 @@ Space Grotesk
 Source Serif 4
   Copyright 2014-2021 Adobe (http://www.adobe.com/),
   with Reserved Font Name "Source".
+
+Noto Sans CJK TC and Noto Serif CJK TC
+  Traditional Chinese subset (files named Noto Sans TC and Noto Serif TC)
+  from Noto CJK Sans 2.004 and Noto CJK Serif 2.003.
+  Copyright 2014-2021 Adobe for Noto Sans CJK.
+  Copyright 2017-2024 Adobe for Noto Serif CJK.
+  Reserved Font Name "Source". Source is a trademark of Adobe.
+  Also Copyright 2012 Google LLC.
+  License text: public/fonts/cjk/OFL-Noto.txt
+
+Iansui (芫荽)
+  Copyright 2025 The Iansui Project Authors (https://github.com/ButTaiwan/iansui)
+  License text: public/fonts/cjk/OFL-Iansui.txt
+
+jf open 粉圓
+  Copyright 2020-2024 justfont Co., LTD., with Reserved Font Names
+  "open huninn" and "huninn". The Hanzi is derived from Kosugi Maru
+  (Copyright 2010 MOTOYA CO., LTD., Apache-2.0).
+  License text: public/fonts/cjk/OFL-Huninn.txt

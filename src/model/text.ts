@@ -109,10 +109,15 @@ export function buildLabelArt(font: Font, label: ResolvedLabel): LabelArt {
   };
 }
 
-export function buildArtMap(labels: ResolvedLabel[], fonts: Map<string, Font>): Map<string, LabelArt> {
+export function buildArtMap(
+  labels: ResolvedLabel[],
+  fonts: Map<string, Font>,
+  skipFallback?: ReadonlySet<string>,
+): Map<string, LabelArt> {
   const arts = new Map<string, LabelArt>();
   for (const label of labels) {
-    const font = fontFor(fonts, label.typefaceId);
+    const exact = fonts.get(label.typefaceId);
+    const font = exact ?? (skipFallback?.has(label.typefaceId) ? undefined : fontFor(fonts, label.typefaceId));
     if (!font) continue;
     arts.set(label.id, buildLabelArt(font, label));
   }

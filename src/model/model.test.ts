@@ -3,6 +3,7 @@ import { parse } from "opentype.js";
 import { describe, expect, it } from "vitest";
 import { LUBAN_UNITS_PER_MM } from "../types";
 import { renderLabelSvg, renderPlateSvg, renderSheetSvg } from "../export/svg";
+import { BUILTIN_FONTS } from "./fonts";
 import { formatNum, parseLabelList, roundedRectPath, transformPath } from "./format";
 import { paginate } from "./layout";
 import { reducer } from "./reducer";
@@ -42,6 +43,30 @@ function box(partial: Partial<ResolvedLabel> & Pick<ResolvedLabel, "text" | "wid
     fontSizeSource: "label",
   };
 }
+
+describe("Traditional Chinese faces", () => {
+  it("lists Noto Sans CJK TC Bold and the other weights", () => {
+    const names = BUILTIN_FONTS.filter((font) => font.family === "Noto Sans CJK TC").map((font) => font.name);
+    expect(names).toEqual([
+      "Noto Sans CJK TC Thin",
+      "Noto Sans CJK TC Light",
+      "Noto Sans CJK TC DemiLight",
+      "Noto Sans CJK TC Regular",
+      "Noto Sans CJK TC Medium",
+      "Noto Sans CJK TC Bold",
+      "Noto Sans CJK TC Black",
+    ]);
+    expect(BUILTIN_FONTS.find((font) => font.id === "noto-sans-cjk-tc-bold")?.defer).toBe(true);
+  });
+
+  it("draws a Traditional Chinese label in Noto Sans CJK TC Bold", () => {
+    const font = loadFont("public/fonts/cjk/NotoSansTC-Bold.otf");
+    const art = buildLabelArt(font, box({ text: "傳統中文標籤", width: 70, height: 16, fontSize: 8, padding: 1 }));
+    expect(art.missing).toEqual([]);
+    expect(art.overflow).toBe(false);
+    expect(art.textPath.length).toBeGreaterThan(100);
+  });
+});
 
 describe("parseLabelList", () => {
   it("reads width and height from the end of a line", () => {

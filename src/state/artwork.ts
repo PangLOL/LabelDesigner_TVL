@@ -7,10 +7,10 @@ import { useStore } from "./store";
 
 export function useArtwork() {
   const { project } = useStore();
-  const { fonts, ready, custom } = useFonts();
+  const { fonts, ready, custom, pending } = useFonts();
   return useMemo(() => {
     const resolved = resolveAll(project);
-    const arts = buildArtMap(resolved, fonts);
+    const arts = buildArtMap(resolved, fonts, pending);
     const sheetPages = paginate(resolved, sheetFrame(project));
     const platePages = paginate(resolved, plateFrame(project));
     const oversized = (pages: typeof sheetPages) =>
@@ -26,5 +26,5 @@ export function useArtwork() {
       custom,
       fonts,
     };
-  }, [project, fonts, ready, custom]);
+  }, [project, fonts, ready, custom, pending]);
 }

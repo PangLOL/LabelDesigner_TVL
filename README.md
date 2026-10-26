@@ -66,4 +66,15 @@ Lettering is converted to filled paths, so Luban does not need the font installe
 
 A plate file is the full bed. If Luban crops to the artwork bounds, set the object to the bed size in the file name, or import the individual label files.
 
-Built-in faces are Latin subsets (Inter, IBM Plex Sans, IBM Plex Mono, Barlow Condensed, Space Grotesk, Source Serif 4), licensed under the SIL Open Font License in `public/fonts`. **Fonts → Add font file** accepts TTF, OTF, or WOFF, including a Traditional Chinese or brand face. Added fonts stay in this browser.
+Built-in Latin faces are Inter, IBM Plex Sans, IBM Plex Mono, Barlow Condensed, Space Grotesk, and Source Serif 4.
+
+Traditional Chinese is in the typeface menu under **Traditional Chinese**:
+
+- **Noto Sans CJK TC** Thin, Light, DemiLight, Regular, Medium, Bold, and Black
+- **Noto Serif CJK TC** Regular and Bold
+- **Iansui 芫荽**
+- **jf open 粉圓**
+
+These are the official Traditional Chinese subsets, so a label can use the characters people actually print. A weight downloads the first time a label uses it. The files are large, so the first preview of that face takes a moment and then stays in the browser.
+
+All of these faces are free to use under the SIL Open Font License. Copyright lines are in `public/fonts/NOTICE.txt`. **Fonts → Add font file** still accepts a TTF, OTF, or WOFF, including another brand face. Added fonts stay in this browser.
