@@ -11,7 +11,7 @@ export function useArtwork() {
   return useMemo(() => {
     const resolved = resolveAll(project);
     const arts = buildArtMap(resolved, fonts, pending);
-    const sheetPages = paginate(resolved, sheetFrame(project));
+    const sheetPages = paginate(resolved, sheetFrame(project), { groupRows: true });
     const platePages = paginate(resolved, plateFrame(project));
     const oversized = (pages: typeof sheetPages) =>
       new Set(pages.flatMap((page) => page.placements.filter((item) => item.oversized).map((item) => item.label.id)));

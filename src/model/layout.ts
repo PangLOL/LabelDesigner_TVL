@@ -1,4 +1,5 @@
 import type { Project } from "../types";
+import { formatMm } from "./format";
 import type { ResolvedLabel } from "./resolve";
 
 /** Room under a label for the width dimension, in millimetres. */
@@ -23,9 +24,22 @@ export interface Placement {
   oversized: boolean;
 }
 
+export interface GroupHeading {
+  name: string;
+  /** Resolved group height, or a short note when the labels in the group differ. */
+  heightText: string;
+  groupIndex: number;
+  x: number;
+  y: number;
+}
+
 export interface LaidPage {
   placements: Placement[];
+  headings: GroupHeading[];
 }
+
+/** Vertical room for a group name and its height, before that group's labels. */
+export const GROUP_BAND = 8;
 
 export function frameBottomInset(margin: number, calibrate: boolean): number {
   return calibrate ? Math.max(margin, 16) : margin;
@@ -60,7 +74,14 @@ export function cellSize(label: { width: number; height: number }, showDimension
   };
 }
 
-export function paginate(labels: ResolvedLabel[], frame: Frame): LaidPage[] {
+function groupHeightText(labels: ResolvedLabel[], groupId: string): string {
+  const heights = new Set(labels.filter((label) => label.groupId === groupId).map((label) => formatMm(label.height)));
+  if (heights.size === 1) return `${[...heights][0]} mm`;
+  return "mixed heights";
+}
+
+export function paginate(labels: ResolvedLabel[], frame: Frame, options?: { groupRows?: boolean }): LaidPage[] {
+  const groupRows = options?.groupRows ?? false;
   const box = {
     left: frame.margin,
     top: frame.margin,
@@ -71,40 +92,77 @@ export function paginate(labels: ResolvedLabel[], frame: Frame): LaidPage[] {
   const contentH = box.bottom - box.top;
   const pages: LaidPage[] = [];
   let placements: Placement[] = [];
+  let headings: GroupHeading[] = [];
   let x = box.left;
   let y = box.top;
   let rowHeight = 0;
+  let lastGroup: string | null = null;
 
   const commit = () => {
-    pages.push({ placements });
+    pages.push({ placements, headings });
     placements = [];
+    headings = [];
     x = box.left;
     y = box.top;
     rowHeight = 0;
+  };
+
+  const addHeading = (label: ResolvedLabel) => {
+    headings.push({
+      name: label.groupName,
+      heightText: groupHeightText(labels, label.groupId),
+      groupIndex: label.groupIndex,
+      x: box.left,
+      y,
+    });
+    y += GROUP_BAND;
   };
 
   for (const label of labels) {
     const cell = cellSize(label, frame.showDimensions);
     const fits = cell.width <= contentW + 0.01 && cell.height <= contentH + 0.01 && contentW > 1 && contentH > 1;
     if (!fits) {
-      if (placements.length) commit();
+      if (placements.length || headings.length) commit();
       placements.push({ label, x: box.left, y: box.top, oversized: true });
       commit();
+      lastGroup = label.groupId;
       continue;
     }
-    if (x > box.left + 0.01 && x + cell.width > box.right + 0.01) {
+
+    const newGroup = groupRows && lastGroup !== null && label.groupId !== lastGroup;
+    if (newGroup && x > box.left + 0.01) {
       x = box.left;
       y += rowHeight + frame.gap;
       rowHeight = 0;
     }
-    if (y + cell.height > box.bottom + 0.01) {
-      if (placements.length) commit();
+
+    let band = groupRows && (label.groupId !== lastGroup || (placements.length === 0 && headings.length === 0)) ? GROUP_BAND : 0;
+    if (y + band + cell.height > box.bottom + 0.01) {
+      if (placements.length || headings.length) {
+        commit();
+        band = groupRows ? GROUP_BAND : 0;
+      } else {
+        band = 0;
+      }
     }
+    if (band > 0 && y + band + cell.height <= box.bottom + 0.01) addHeading(label);
+
+    if (x > box.left + 0.01 && x + cell.width > box.right + 0.01) {
+      x = box.left;
+      y += rowHeight + frame.gap;
+      rowHeight = 0;
+      if (y + cell.height > box.bottom + 0.01 && (placements.length || headings.length)) {
+        commit();
+        if (groupRows && y + GROUP_BAND + cell.height <= box.bottom + 0.01) addHeading(label);
+      }
+    }
+
     placements.push({ label, x, y, oversized: false });
     x += cell.width + frame.gap;
     rowHeight = Math.max(rowHeight, cell.height);
+    lastGroup = label.groupId;
   }
 
-  if (placements.length || pages.length === 0) pages.push({ placements });
+  if (placements.length || headings.length || pages.length === 0) pages.push({ placements, headings });
   return pages;
 }

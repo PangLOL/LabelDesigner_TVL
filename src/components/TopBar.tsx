@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import type { SvgUnit } from "../types";
 import { formatMm } from "../model/format";
 import { blankProject, sanitizeProject } from "../model/project";
+import { projectToCsv } from "../export/csv";
 import { buildSvgZip, downloadBlob, projectSlug } from "../export/download";
 import { svgPagesToPdf } from "../export/pdf";
 import { labelDownloadName, renderLabelSvg, renderPlateSvg, renderSheetSvg, withXml } from "../export/svg";
@@ -21,6 +22,17 @@ export function TopBar() {
   const jsonRef = useRef<HTMLInputElement>(null);
   const fontRef = useRef<HTMLInputElement>(null);
   const closeSvg = useCallback(() => setSvgOpen(false), []);
+
+  const saveProject = () => {
+    downloadBlob(
+      new Blob([JSON.stringify(project, null, 2)], { type: "application/json" }),
+      `${projectSlug(project.name)}.labels.json`,
+    );
+  };
+
+  const exportCsv = () => {
+    downloadBlob(new Blob([projectToCsv(project, custom)], { type: "text/csv;charset=utf-8" }), `${projectSlug(project.name)}-parameters.csv`);
+  };
 
   const exportPdf = async () => {
     setMessage(null);
@@ -108,11 +120,17 @@ export function TopBar() {
         onChange={(event) => dispatch({ type: "rename", name: event.target.value })}
       />
       <div className="spacer" />
+      <button type="button" className="btn" onClick={saveProject}>
+        Save
+      </button>
+      <button type="button" className="btn" aria-label="Export parameters as CSV" onClick={exportCsv}>
+        CSV
+      </button>
       <button
         type="button"
         className="btn"
         onClick={() => {
-          if (project.labels.length > 0 && !window.confirm("Replace this project with an empty one?")) return;
+          if (project.labels.length > 0 && !window.confirm("Replace this project with an empty one? Save a copy first if you still need it.")) return;
           dispatch({ type: "replace", project: blankProject() });
           setSelected(new Set());
         }}
@@ -121,20 +139,16 @@ export function TopBar() {
       </button>
       <details className="pop">
         <summary className="btn">File</summary>
-        <div className="pop-panel">
-          <button
-            type="button"
-            onClick={() =>
-              downloadBlob(
-                new Blob([JSON.stringify(project, null, 2)], { type: "application/json" }),
-                `${projectSlug(project.name)}.labels.json`,
-              )
-            }
-          >
-            Download project
+        <div className="pop-panel file-panel">
+          <p>Save writes a project file. Open project reads it back, including on another day. CSV is the same parameters for a spreadsheet. This browser keeps the current project until you click New.</p>
+          <button type="button" onClick={saveProject}>
+            Save project
           </button>
           <button type="button" onClick={() => jsonRef.current?.click()}>
             Open project
+          </button>
+          <button type="button" onClick={exportCsv}>
+            Export CSV
           </button>
         </div>
       </details>
