@@ -15,7 +15,7 @@ npm run dev
 
 Open the local address Vite prints. `npm test` checks inheritance, packing, and SVG sizing. `npm run build` typechecks and builds the static app. A GitHub Pages build sets `VITE_BASE` to `/LabelDesigner_TVL/` so fonts and scripts load from that path.
 
-The project saves in this browser and starts empty. **File → Download project** writes a JSON file you can open later. **New** clears the labels.
+The project stays in this browser until you click **New**, and it starts empty. **Save** writes a project file. **File → Open project** reads that file back, including on another day or in another browser. **CSV** writes the same parameters as a spreadsheet: one row for the project, one for each group, and one for each label. A blank line font or alignment in the CSV follows the label or the group. **New** asks before it clears the labels.
 
 ## How the sizes work
 
@@ -43,7 +43,7 @@ Select one or more labels, choose another label in **Attach selected to**, then 
 
 ## Preview
 
-**Print sheet** packs the labels onto A4, US Letter, or a custom page, with dimension lines and a 100 mm calibration bar. The on-screen view is scaled to fit. The percentage is relative to a typical screen millimetre, not a promise about your display.
+**Print sheet** packs the labels onto A4, US Letter, or a custom page, with dimension lines and a 100 mm calibration bar. Each group starts on its own row, with the group name and height above its labels. The build plate still packs labels tightly, without those headings. The on-screen view is scaled to fit. The percentage is relative to a typical screen millimetre, not a promise about your display.
 
 **Build plate** packs the same labels onto a Snapmaker 2.0 bed:
 

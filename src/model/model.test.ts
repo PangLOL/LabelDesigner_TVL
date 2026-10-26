@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { parse } from "opentype.js";
 import { describe, expect, it } from "vitest";
 import { LUBAN_UNITS_PER_MM } from "../types";
+import { projectToCsv } from "../export/csv";
 import { renderLabelSvg, renderPlateSvg, renderSheetSvg } from "../export/svg";
 import { BUILTIN_FONTS } from "./fonts";
 import { formatNum, parseLabelList, roundedRectPath, transformPath } from "./format";
@@ -27,9 +28,9 @@ function box(partial: Partial<ResolvedLabel> & Pick<ResolvedLabel, "text" | "wid
   const lines = partial.pieces?.[0]?.lines ?? partial.text.split("\n").map((text) => ({ text, fontSize: partial.fontSize, align: partial.align ?? "center" as const }));
   return {
     id: partial.id ?? "id",
-    groupId: "g",
-    groupName: "Group",
-    groupIndex: 0,
+    groupId: partial.groupId ?? "g",
+    groupName: partial.groupName ?? "Group",
+    groupIndex: partial.groupIndex ?? 0,
     text: partial.text,
     width: partial.width,
     height: partial.height,
@@ -187,6 +188,56 @@ describe("paginate", () => {
     });
     expect(pages).toHaveLength(1);
     expect(pages[0].placements[0]?.oversized).toBe(true);
+  });
+
+  it("starts each group on its own row and prints the group name and height", () => {
+    const labels = [
+      box({ id: "a", text: "A", width: 30, height: 12, fontSize: 5, groupId: "g1", groupName: "Power", groupIndex: 0 }),
+      box({ id: "b", text: "B", width: 30, height: 12, fontSize: 5, groupId: "g1", groupName: "Power", groupIndex: 0 }),
+      box({ id: "c", text: "C", width: 30, height: 18, fontSize: 5, groupId: "g2", groupName: "Lights", groupIndex: 1 }),
+    ];
+    const frame = { width: 200, height: 120, margin: 10, gap: 4, showDimensions: false, bottomInset: 10 };
+    const packed = paginate(labels, frame);
+    expect(packed[0].placements.map((item) => item.y)).toEqual([10, 10, 10]);
+
+    const pages = paginate(labels, frame, { groupRows: true });
+    const [first, second, third] = pages[0].placements;
+    expect(first.y).toBe(second.y);
+    expect(third.y).toBeGreaterThan(first.y + first.label.height);
+    expect(pages[0].headings.map((heading) => [heading.name, heading.heightText])).toEqual([
+      ["Power", "12 mm"],
+      ["Lights", "18 mm"],
+    ]);
+    expect(pages[0].headings[0].y).toBeLessThan(first.y);
+    expect(pages[0].headings[1].y).toBeLessThan(third.y);
+
+    const svg = renderSheetSvg(pages[0], 200, 120, new Map(), mono, {
+      preview: true,
+      showDimensions: false,
+      showCalibration: false,
+    });
+    expect(svg).toContain('data-group-heading="Power"');
+    expect(svg).toContain('data-group-heading="Lights"');
+  });
+});
+
+describe("project csv", () => {
+  it("lists the project, the group, and each label", () => {
+    let project = blankProject();
+    project = { ...project, name: "Door, west" };
+    const groupId = project.groups[0].id;
+    project = reducer(project, { type: "addLabel", groupId });
+    const label = project.labels[0];
+    project = reducer(project, { type: "setPieceText", labelId: label.id, pieceId: label.pieces[0].id, text: "UP\nDOWN" });
+    project = reducer(project, { type: "updateLine", labelId: label.id, pieceId: label.pieces[0].id, index: 0, patch: { fontSize: 4 } });
+    const csv = projectToCsv(project);
+    expect(csv.charCodeAt(0)).toBe(0xfeff);
+    expect(csv).toContain('"Door, west"');
+    expect(csv).toContain("Group 1");
+    expect(csv).toContain("UP | DOWN");
+    expect(csv).toContain("4 | ");
+    expect(csv).toContain("40");
+    expect(csv).toContain("210 x 297");
   });
 });
 

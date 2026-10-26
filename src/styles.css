@@ -429,6 +429,8 @@ textarea.field {
   box-shadow: 0 12px 30px rgba(60, 42, 16, 0.12);
 }
 .pop-panel button, .font-row { width: 100%; justify-content: space-between; text-align: left; }
+.file-panel { width: 300px; }
+.file-panel p { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
 .font-panel { display: flex; flex-direction: column; gap: 8px; }
 .font-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

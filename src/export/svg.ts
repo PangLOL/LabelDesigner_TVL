@@ -141,6 +141,20 @@ export function renderSheetSvg(
   if (options.preview) {
     body.push(`<rect x="0" y="0" width="${formatNum(width)}" height="${formatNum(height)}" fill="#fffcf7"/>`);
   }
+  if (dimensionFont) {
+    for (const heading of page.headings ?? []) {
+      const color = groupSwatch(heading.groupIndex);
+      const caption = `${heading.name}  ·  ${heading.heightText}`;
+      const baseline = heading.y + 4.4;
+      body.push(`<g data-group-heading="${escapeXml(heading.name)}">`);
+      body.push(`<path d="${textPathAt(dimensionFont, caption, heading.x, baseline, 3.2)}" fill="${color}"/>`);
+      const ruleY = baseline + 1.6;
+      body.push(
+        `<path d="M${formatNum(heading.x)} ${formatNum(ruleY)}H${formatNum(width - heading.x)}" fill="none" stroke="${color}" stroke-width="${options.preview ? 1 : 0.15}"${options.preview ? ` vector-effect="non-scaling-stroke"` : ""}/>`,
+      );
+      body.push("</g>");
+    }
+  }
   for (const placement of page.placements) {
     const art = arts.get(placement.label.id);
     if (!art) continue;
