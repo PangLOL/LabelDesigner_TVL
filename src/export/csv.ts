@@ -387,6 +387,12 @@ function draftGroup(name: string): DraftGroup {
   };
 }
 
+/** True when the text is a spreadsheet from this app, including a .txt copy. */
+export function isLabelCsv(text: string): boolean {
+  const body = text.replace(/^\uFEFF/, "").trimStart().toLowerCase();
+  return body.startsWith("record,") || body.startsWith("record;");
+}
+
 /**
  * Reads a CSV written by this app, including an older sheet that has no layout column.
  * A blank line font or alignment follows the label or the group.

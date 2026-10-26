@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { parse } from "opentype.js";
 import { describe, expect, it } from "vitest";
 import { LUBAN_UNITS_PER_MM } from "../types";
-import { projectFromCsv, projectToCsv } from "../export/csv";
+import { isLabelCsv, projectFromCsv, projectToCsv } from "../export/csv";
 import { renderLabelSvg, renderPlateSvg, renderSheetSvg } from "../export/svg";
 import { BUILTIN_FONTS } from "./fonts";
 import { formatNum, parseLabelList, roundedRectPath, transformPath } from "./format";
@@ -238,6 +238,9 @@ describe("project csv", () => {
     expect(csv).toContain("4 | ");
     expect(csv).toContain("40");
     expect(csv).toContain("210 x 297");
+    expect(isLabelCsv(csv)).toBe(true);
+    expect(isLabelCsv("\uFEFFrecord;group\r\n")).toBe(true);
+    expect(isLabelCsv('{"version":1}')).toBe(false);
   });
 
   it("opens a csv on another computer, including an older sheet and a combined label", () => {

@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import type { SvgUnit } from "../types";
 import { formatMm } from "../model/format";
 import { blankProject, sanitizeProject } from "../model/project";
-import { projectFromCsv, projectToCsv } from "../export/csv";
+import { isLabelCsv, projectFromCsv, projectToCsv } from "../export/csv";
 import { buildSvgZip, downloadBlob, projectSlug } from "../export/download";
 import { svgPagesToPdf } from "../export/pdf";
 import { labelDownloadName, renderLabelSvg, renderPlateSvg, renderSheetSvg, withXml } from "../export/svg";
@@ -140,7 +140,7 @@ export function TopBar() {
       <details className="pop">
         <summary className="btn">File</summary>
         <div className="pop-panel file-panel">
-          <p>Save writes a project file. Open project reads that file, or a CSV from this app, so the same labels can continue on another computer. This browser keeps the current project until you click New.</p>
+          <p>Save writes a project file. Open project reads that file or a CSV, including a .txt copy of the spreadsheet. The file window lists every file, so a CSV is not greyed out on a Mac. This browser keeps the current project until you click New.</p>
           <button type="button" onClick={saveProject}>
             Save project
           </button>
@@ -181,7 +181,6 @@ export function TopBar() {
       <input
         ref={jsonRef}
         type="file"
-        accept="application/json,.json,text/csv,.csv"
         hidden
         onChange={async (event) => {
           const file = event.target.files?.[0];
@@ -189,7 +188,7 @@ export function TopBar() {
           if (!file) return;
           try {
             const text = await file.text();
-            const csv = file.name.toLowerCase().endsWith(".csv") || text.replace(/^\uFEFF/, "").trimStart().startsWith("record,") || text.replace(/^\uFEFF/, "").trimStart().startsWith("record;");
+            const csv = isLabelCsv(text) || file.name.toLowerCase().endsWith(".csv");
             const next = csv ? projectFromCsv(text, custom) : sanitizeProject(JSON.parse(text));
             if (!next) {
               setMessage("That file is not a label project.");
