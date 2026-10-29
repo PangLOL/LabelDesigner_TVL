@@ -45,7 +45,9 @@ Select one or more labels, choose another label in **Attach selected to**, then 
 
 **Print sheet** packs the labels onto A4, US Letter, or a custom page, with dimension lines and a 100 mm calibration bar. Each group starts on its own row, with the group name and height above its labels. The build plate still packs labels tightly, without those headings. The on-screen view is scaled to fit. The percentage is relative to a typical screen millimetre, not a promise about your display.
 
-**Build plate** packs the same labels onto a Snapmaker 2.0 bed:
+**Bed width** and **Bed length** set the build plate, in millimetres. Choosing a Snapmaker model fills both boxes. Typing in either box keeps your own size.
+
+**Build plate** packs the same labels onto that bed:
 
 | Machine | Work area |
 | --- | --- |
@@ -61,12 +63,12 @@ Red outlines are cut paths. Black lettering is meant to be engraved. Screen-only
 
 ## Snapmaker SVG
 
-**Snapmaker SVG** exports one tight file per label, one file for the whole bed, or both.
+**Snapmaker SVG** downloads a zip. Each label, and each plate, is two SVG files of the same size. **engrave/** is the lettering only, filled black, for a filled engrave. **cut/** is the label outline only, for a cut. Import them as two operations so the outline can be a cut and the lettering a filled engrave.
 
 - **Luban 72 DPI** matches a drag onto the Luban canvas. The file name ends with the millimetre size, such as `01-on-32x12mm.svg`. If Luban shows a different size, select the object and type the width and height from the file name. Some Luban versions treat **File → Import** differently from dragging the file onto the canvas, so check the size either way.
 - **Millimetres** is the file to open in Inkscape, LightBurn, or Illustrator.
 
-Lettering is converted to filled paths, so Luban does not need the font installed. Black is the lettering. A red outline is the cut. Map those colours to separate operations in Luban.
+Lettering is converted to filled paths, so Luban does not need the font installed. The engrave file has no border. The cut file has no lettering, and its path is red.
 
 A plate file is the full bed. If Luban crops to the artwork bounds, set the object to the bed size in the file name, or import the individual label files.
 

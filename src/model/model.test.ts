@@ -1,8 +1,10 @@
 import { readFileSync } from "node:fs";
 import { parse } from "opentype.js";
+import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 import { LUBAN_UNITS_PER_MM } from "../types";
 import { isLabelCsv, projectFromCsv, projectToCsv } from "../export/csv";
+import { buildSvgZip } from "../export/download";
 import { renderLabelSvg, renderPlateSvg, renderSheetSvg } from "../export/svg";
 import { BUILTIN_FONTS } from "./fonts";
 import { formatNum, parseLabelList, roundedRectPath, transformPath } from "./format";
@@ -443,6 +445,56 @@ describe("paths and svg", () => {
     expect(luban).toContain(`viewBox="0 0 ${width} ${height}"`);
     expect(luban).not.toContain("#ff0000");
     expect(luban).toContain('data-width-mm="32"');
+  });
+
+  it("writes filled lettering and the cut outline as separate files", async () => {
+    const label = box({ text: "ON", width: 32, height: 12, fontSize: 5 });
+    const art = buildLabelArt(inter, label);
+    const text = renderLabelSvg(label, art, "mm", false, "engrave", "text");
+    const cut = renderLabelSvg(label, art, "mm", false, "engrave", "outline");
+    expect(text).toContain('fill="#000000"');
+    expect(text).not.toContain("label-edge");
+    expect(cut).toContain('class="label-edge"');
+    expect(cut).toContain('stroke="#ff0000"');
+    expect(cut).not.toContain('fill="#000000"');
+    expect(text).toContain('viewBox="0 0 32 12"');
+    expect(cut).toContain('viewBox="0 0 32 12"');
+
+    const page = { placements: [{ label, x: 8, y: 8, oversized: false }], headings: [] };
+    const plateText = renderPlateSvg(page, 160, 200, "mm", false, "engrave", new Map([[label.id, art]]), { preview: false, part: "text" });
+    const plateCut = renderPlateSvg(page, 160, 200, "mm", false, "engrave", new Map([[label.id, art]]), { preview: false, part: "outline" });
+    expect(plateText).toContain('data-width-mm="160"');
+    expect(plateText).toContain('data-height-mm="200"');
+    expect(plateText).toContain('fill="#000000"');
+    expect(plateText).not.toContain("label-edge");
+    expect(plateCut).toContain('stroke="#ff0000"');
+    expect(plateCut).not.toContain('fill="#000000"');
+
+    const zip = await buildSvgZip({
+      unit: "mm",
+      labels: true,
+      plate: true,
+      resolved: [label],
+      arts: new Map([[label.id, art]]),
+      platePages: [page],
+      plateSettings: { preset: "custom", width: 160, height: 200, margin: 8, gap: 4, outline: true, outlineMode: "cut" },
+    });
+    const archive = await JSZip.loadAsync(await zip.arrayBuffer());
+    expect(Object.keys(archive.files).sort()).toEqual([
+      "READ-ME.txt",
+      "cut/",
+      "cut/01-on-32x12mm.svg",
+      "cut/plate-1-160x200mm.svg",
+      "engrave/",
+      "engrave/01-on-32x12mm.svg",
+      "engrave/plate-1-160x200mm.svg",
+    ]);
+    const engrave = await archive.file("engrave/01-on-32x12mm.svg")?.async("string");
+    const outline = await archive.file("cut/01-on-32x12mm.svg")?.async("string");
+    expect(engrave).toContain('fill="#000000"');
+    expect(engrave).not.toContain("label-edge");
+    expect(outline).toContain('stroke="#ff0000"');
+    expect(outline).not.toContain('fill="#000000"');
   });
 
   it("keeps dimension marks off the machine plate", () => {

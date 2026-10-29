@@ -1,11 +1,10 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { SvgUnit } from "../types";
-import { formatMm } from "../model/format";
 import { blankProject, sanitizeProject } from "../model/project";
 import { isLabelCsv, projectFromCsv, projectToCsv } from "../export/csv";
 import { buildSvgZip, downloadBlob, projectSlug } from "../export/download";
 import { svgPagesToPdf } from "../export/pdf";
-import { labelDownloadName, renderLabelSvg, renderPlateSvg, renderSheetSvg, withXml } from "../export/svg";
+import { renderSheetSvg } from "../export/svg";
 import { DIMENSION_FONT_ID, FALLBACK_FONT_ID } from "../model/fonts";
 import { useArtwork } from "../state/artwork";
 import { useFonts } from "../state/fonts";
@@ -64,26 +63,6 @@ export function TopBar() {
         setMessage("Add a label before exporting SVG.");
         return;
       }
-      if (labelFiles.length === 1 && plates.length === 0) {
-        const label = labelFiles[0];
-        const art = arts.get(label.id);
-        if (!art) return;
-        const svg = withXml(renderLabelSvg(label, art, choice.unit, project.plate.outline, project.plate.outlineMode));
-        downloadBlob(new Blob([svg], { type: "image/svg+xml" }), labelDownloadName(0, label));
-        return;
-      }
-      if (labelFiles.length === 0 && plates.length === 1) {
-        const svg = withXml(
-          renderPlateSvg(plates[0], project.plate.width, project.plate.height, choice.unit, project.plate.outline, project.plate.outlineMode, arts, {
-            preview: false,
-          }),
-        );
-        downloadBlob(
-          new Blob([svg], { type: "image/svg+xml" }),
-          `${projectSlug(project.name)}-plate-1-${formatMm(project.plate.width)}x${formatMm(project.plate.height)}mm.svg`,
-        );
-        return;
-      }
       const blob = await buildSvgZip({
         unit: choice.unit,
         labels: choice.labels,
@@ -92,8 +71,6 @@ export function TopBar() {
         arts,
         platePages,
         plateSettings: project.plate,
-        outline: project.plate.outline,
-        outlineMode: project.plate.outlineMode,
       });
       downloadBlob(blob, `${projectSlug(project.name)}-snapmaker.zip`);
     } catch (reason) {
@@ -137,24 +114,19 @@ export function TopBar() {
       >
         New
       </button>
-      <details className="pop">
-        <summary className="btn">File</summary>
-        <div className="pop-panel file-panel">
-          <p>Save writes a project file. Open project reads that file or a CSV, including a .txt copy of the spreadsheet. The file window lists every file, so a CSV is not greyed out on a Mac. This browser keeps the current project until you click New.</p>
-          <button type="button" onClick={saveProject}>
-            Save project
-          </button>
-          <button type="button" onClick={() => jsonRef.current?.click()}>
-            Open project
-          </button>
-          <button type="button" onClick={exportCsv}>
-            Export CSV
-          </button>
-        </div>
-      </details>
-      <details className="pop">
-        <summary className="btn">Fonts</summary>
-        <div className="pop-panel font-panel">
+      <DropMenu summary="File" panelClass="pop-panel file-panel">
+        <p>Save writes a project file. Open project reads that file or a CSV, including a .txt copy of the spreadsheet. The file window lists every file, so a CSV is not greyed out on a Mac. This browser keeps the current project until you click New.</p>
+        <button type="button" onClick={saveProject}>
+          Save project
+        </button>
+        <button type="button" onClick={() => jsonRef.current?.click()}>
+          Open project
+        </button>
+        <button type="button" onClick={exportCsv}>
+          Export CSV
+        </button>
+      </DropMenu>
+      <DropMenu summary="Fonts" panelClass="pop-panel font-panel">
           <p>Built-in faces cover Latin and Traditional Chinese. Add a TTF, OTF, or WOFF for another face.</p>
           <button type="button" className="btn" onClick={() => fontRef.current?.click()}>
             Add font file
@@ -169,8 +141,7 @@ export function TopBar() {
               </button>
             </div>
           ))}
-        </div>
-      </details>
+      </DropMenu>
       <button type="button" className="btn primary" data-testid="export-pdf" disabled={!ready} onClick={() => void exportPdf()}>
         PDF 1:1
       </button>
@@ -221,5 +192,42 @@ export function TopBar() {
       />
       {svgOpen && <ExportDialog onClose={closeSvg} onExport={(choice) => void exportSvg(choice)} />}
     </header>
+  );
+}
+
+function DropMenu({ summary, panelClass, children }: { summary: string; panelClass: string; children: ReactNode }) {
+  const ref = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const menu = ref.current;
+      if (!menu?.open) return;
+      if (event.target instanceof Node && menu.contains(event.target)) return;
+      menu.open = false;
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && ref.current?.open) ref.current.open = false;
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
+  return (
+    <details className="pop" ref={ref}>
+      <summary className="btn">{summary}</summary>
+      <div
+        className={panelClass}
+        onClick={(event) => {
+          if (!(event.target instanceof HTMLElement) || !event.target.closest("button")) return;
+          if (ref.current) ref.current.open = false;
+        }}
+      >
+        {children}
+      </div>
+    </details>
   );
 }

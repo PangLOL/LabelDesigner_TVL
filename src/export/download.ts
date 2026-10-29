@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import type { OutlineMode, PlateSettings, SvgUnit } from "../types";
+import type { PlateSettings, SvgUnit } from "../types";
 import { formatMm, slug } from "../model/format";
 import type { LaidPage } from "../model/layout";
 import type { ResolvedLabel } from "../model/resolve";
@@ -33,8 +33,6 @@ export interface SvgBundle {
   arts: Map<string, LabelArt>;
   platePages: LaidPage[];
   plateSettings: PlateSettings;
-  outline: boolean;
-  outlineMode: OutlineMode;
 }
 
 export function lubanReadme(bundle: SvgBundle): string {
@@ -48,15 +46,11 @@ export function lubanReadme(bundle: SvgBundle): string {
     "If Luban shows the wrong size, select the object and type that width and height.",
     "Some Luban versions scale File > Import differently from dragging a file onto the canvas. Prefer drag-and-drop, then check the size.",
     "",
-    "Black paths are the lettering, for a fill / engrave operation.",
+    "Each label is two files with the same size, so they line up.",
+    "engrave/ is the lettering only. The paths are filled black. Use this file as a filled engrave.",
+    "cut/ is the label outline only. The path is red. Use this file as a cut.",
+    "Import them as two operations. The engrave file has no border, and the cut file has no lettering.",
   ];
-  if (bundle.outline && bundle.outlineMode === "cut") {
-    lines.push("Red paths are the label outline, for a cut operation. Map red and black to different operations in Luban.");
-  } else if (bundle.outline) {
-    lines.push("The outline is black, meant to be engraved with the lettering.");
-  } else {
-    lines.push("Outlines are off. The file bounds are the label size.");
-  }
   lines.push(
     "",
     `Build plate: ${formatMm(bundle.plateSettings.width)} × ${formatMm(bundle.plateSettings.height)} mm (${bundle.platePages.length} file${bundle.platePages.length === 1 ? "" : "s"}).`,
@@ -72,18 +66,23 @@ export async function buildSvgZip(bundle: SvgBundle): Promise<Blob> {
     bundle.resolved.forEach((label, index) => {
       const art = artFor(bundle.arts, label);
       if (!art) return;
-      const svg = withXml(renderLabelSvg(label, art, bundle.unit, bundle.outline, bundle.outlineMode));
-      zip.file(`labels/${labelDownloadName(index, label)}`, svg);
+      const name = labelDownloadName(index, label);
+      zip.file(`engrave/${name}`, withXml(renderLabelSvg(label, art, bundle.unit, false, "engrave", "text")));
+      zip.file(`cut/${name}`, withXml(renderLabelSvg(label, art, bundle.unit, true, "cut", "outline")));
     });
   }
   if (bundle.plate) {
     const { width, height } = bundle.plateSettings;
     bundle.platePages.forEach((page, index) => {
-      const svg = withXml(
-        renderPlateSvg(page, width, height, bundle.unit, bundle.outline, bundle.outlineMode, bundle.arts, { preview: false }),
+      const name = `plate-${index + 1}-${formatMm(width)}x${formatMm(height)}mm.svg`;
+      zip.file(
+        `engrave/${name}`,
+        withXml(renderPlateSvg(page, width, height, bundle.unit, false, "engrave", bundle.arts, { preview: false, part: "text" })),
       );
-      const name = `plates/plate-${index + 1}-${formatMm(width)}x${formatMm(height)}mm.svg`;
-      zip.file(name, svg);
+      zip.file(
+        `cut/${name}`,
+        withXml(renderPlateSvg(page, width, height, bundle.unit, true, "cut", bundle.arts, { preview: false, part: "outline" })),
+      );
     });
   }
   return zip.generateAsync({ type: "blob" });

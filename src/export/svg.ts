@@ -69,14 +69,26 @@ function edge(art: LabelArt, x: number, y: number, scale: number, stroke: string
   return `<path class="label-edge" d="${d}" fill="none" stroke="${stroke}" stroke-width="${formatNum(strokeWidth)}" stroke-linejoin="miter"${effect}/>`;
 }
 
-export function renderLabelSvg(label: ResolvedLabel, art: LabelArt, unit: SvgUnit, outline: boolean, outlineMode: OutlineMode): string {
+export type SvgPart = "both" | "text" | "outline";
+
+export function renderLabelSvg(
+  label: ResolvedLabel,
+  art: LabelArt,
+  unit: SvgUnit,
+  outline: boolean,
+  outlineMode: OutlineMode,
+  part: SvgPart = "both",
+): string {
   const scale = unitScale(unit);
   const stroke = outlineMode === "cut" ? "#ff0000" : "#000000";
   const parts = [
-    `<!-- ${safeComment(`${label.text} · ${formatMm(label.width)} mm × ${formatMm(label.height)} mm · ${label.typefaceId} · font height ${formatMm(label.fontSize)} mm`)} -->`,
-    `<path d="${transformPath(art.textPath, 0, 0, scale)}" fill="#000000" fill-rule="nonzero"/>`,
+    `<!-- ${safeComment(`${label.text} · ${formatMm(label.width)} mm × ${formatMm(label.height)} mm · ${part === "outline" ? "cut outline" : part === "text" ? "filled lettering" : `${label.typefaceId} · font height ${formatMm(label.fontSize)} mm`}`)} -->`,
   ];
-  if (outline) parts.push(edge(art, 0, 0, scale, stroke, (outlineMode === "cut" ? 0.08 : 0.15) * scale, false));
+  if (part !== "outline") parts.push(`<path d="${transformPath(art.textPath, 0, 0, scale)}" fill="#000000" fill-rule="nonzero"/>`);
+  if (part === "outline" || (part === "both" && outline)) {
+    const cut = part === "outline" || outlineMode === "cut";
+    parts.push(edge(art, 0, 0, scale, cut ? "#ff0000" : stroke, (cut ? 0.08 : 0.15) * scale, false));
+  }
   return svgDocument(label.width, label.height, unit, parts.join(""));
 }
 
@@ -88,14 +100,23 @@ export function renderPlateSvg(
   outline: boolean,
   outlineMode: OutlineMode,
   arts: ArtMap,
-  options: { preview: boolean; selected?: ReadonlySet<string> },
+  options: { preview: boolean; selected?: ReadonlySet<string>; part?: SvgPart },
 ): string {
   const scale = options.preview ? 1 : unitScale(unit);
   const unitForDoc: SvgUnit = options.preview ? "mm" : unit;
+  const part = options.preview ? "both" : (options.part ?? "both");
   const stroke = outlineMode === "cut" ? "#ff0000" : "#000000";
-  const body: string[] = [
-    `<!-- ${safeComment(`Build plate ${formatMm(width)} mm × ${formatMm(height)} mm. Black is lettering. ${outline ? (outlineMode === "cut" ? "Red is the cut outline." : "The outline is engraved with the lettering.") : "Outlines are off."}`)} -->`,
-  ];
+  const note =
+    part === "text"
+      ? "Filled lettering only, for an engrave."
+      : part === "outline"
+        ? "Label outlines only, for a cut."
+        : outline
+          ? outlineMode === "cut"
+            ? "Red is the cut outline."
+            : "The outline is engraved with the lettering."
+          : "Outlines are off.";
+  const body: string[] = [`<!-- ${safeComment(`Build plate ${formatMm(width)} mm × ${formatMm(height)} mm. ${note}`)} -->`];
   if (options.preview) {
     body.push(`<rect x="0" y="0" width="${formatNum(width)}" height="${formatNum(height)}" fill="#fffcf7"/>`);
     body.push(`<rect x="0.4" y="0.4" width="${formatNum(width - 0.8)}" height="${formatNum(height - 0.8)}" fill="none" stroke="#c9c0b2" stroke-width="1" vector-effect="non-scaling-stroke"/>`);
@@ -112,10 +133,13 @@ export function renderPlateSvg(
         `<rect class="hit" x="${formatNum(placement.x)}" y="${formatNum(placement.y)}" width="${formatNum(placement.label.width)}" height="${formatNum(placement.label.height)}" fill="transparent"/>`,
       );
     }
-    body.push(`<path d="${transformPath(art.textPath, placement.x, placement.y, scale)}" fill="#000000" fill-rule="nonzero"/>`);
-    if (outline) {
-      const strokeWidth = options.preview ? 1 : (outlineMode === "cut" ? 0.08 : 0.15) * scale;
-      body.push(edge(art, placement.x, placement.y, scale, options.preview && outlineMode === "cut" ? "#ff0000" : stroke, strokeWidth, options.preview));
+    if (part !== "outline") {
+      body.push(`<path d="${transformPath(art.textPath, placement.x, placement.y, scale)}" fill="#000000" fill-rule="nonzero"/>`);
+    }
+    if (part === "outline" || (part === "both" && outline)) {
+      const cut = part === "outline" || outlineMode === "cut";
+      const strokeWidth = options.preview ? 1 : (cut ? 0.08 : 0.15) * scale;
+      body.push(edge(art, placement.x, placement.y, scale, cut ? "#ff0000" : stroke, strokeWidth, options.preview));
     } else if (options.preview) {
       body.push(edge(art, placement.x, placement.y, scale, "#b7ad9c", 1, true));
     }
