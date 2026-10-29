@@ -95,6 +95,26 @@ export function Preview() {
             Build plate
           </button>
         </div>
+        <label>
+          Bed width
+          <MmInput
+            label="Build plate width"
+            value={project.plate.width}
+            min={20}
+            max={2000}
+            onChange={(width) => dispatch({ type: "setPlate", patch: { width, preset: "custom" } })}
+          />
+        </label>
+        <label>
+          Bed length
+          <MmInput
+            label="Build plate length"
+            value={project.plate.height}
+            min={20}
+            max={2000}
+            onChange={(height) => dispatch({ type: "setPlate", patch: { height, preset: "custom" } })}
+          />
+        </label>
 
         {mode === "sheet" ? (
           <>
@@ -167,14 +187,6 @@ export function Preview() {
                 <option value="a150">A150 · 160 × 160</option>
                 <option value="custom">Custom</option>
               </select>
-            </label>
-            <label>
-              Width
-              <MmInput label="Plate width" value={project.plate.width} min={20} max={2000} onChange={(width) => dispatch({ type: "setPlate", patch: { width, preset: "custom" } })} />
-            </label>
-            <label>
-              Height
-              <MmInput label="Plate height" value={project.plate.height} min={20} max={2000} onChange={(height) => dispatch({ type: "setPlate", patch: { height, preset: "custom" } })} />
             </label>
             <label>
               Margin
@@ -268,9 +280,7 @@ export function Preview() {
         <p>
           {mode === "sheet"
             ? "The PDF is the print sheet at 1:1. Print it at 100% and check the bar."
-            : project.plate.outline && project.plate.outlineMode === "cut"
-              ? "Red outlines are cut paths. Black lettering is for engraving. Guides on screen are omitted from the SVG."
-              : "The plate SVG contains the lettering and any outline you leave on. Screen guides stay off the file."}
+            : "Snapmaker SVG saves two files for each label: filled lettering to engrave, and the outline to cut. Bed width and length set the plate file."}
         </p>
         {overflow > 0 && (
           <p className="warn">

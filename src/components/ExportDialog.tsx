@@ -35,14 +35,15 @@ export function ExportDialog({
       >
         <h2 id="svg-title">Snapmaker SVG</h2>
         <p>
-          Files are sized for the {project.plate.width} × {project.plate.height} mm bed, or cropped tight to each label.
-          Lettering is filled black. {project.plate.outline ? (project.plate.outlineMode === "cut" ? "Outlines are red cut paths." : "Outlines are black, with the lettering.") : "Outlines are off."}
+          The download is a zip with two files for each label, both {project.plate.width} × {project.plate.height} mm on a plate file, or cropped tight for a single label.
+          <strong> engrave/</strong> is the lettering only, filled black, for a filled engrave. <strong> cut/</strong> is the label outline only, for a cut.
+          Import each file as its own operation.
         </p>
         <fieldset>
           <legend>What to export</legend>
           <label>
             <input type="radio" name="what" defaultChecked={false} onChange={() => { what.current = "labels"; }} />
-            One file per label
+            Each label, as engrave and cut
           </label>
           <label>
             <input type="radio" name="what" defaultChecked={false} onChange={() => { what.current = "plate"; }} />
