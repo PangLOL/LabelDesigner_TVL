@@ -1,4 +1,4 @@
-import type { Align, Group, Label, LabelLayout, Project } from "../types";
+import type { Align, Group, Label, LabelLayout, LabelProduct, Project } from "../types";
 
 export type HeightSource = "project" | "group" | "label";
 export type FieldSource = "group" | "label";
@@ -19,6 +19,7 @@ export interface ResolvedLabel {
   groupId: string;
   groupName: string;
   groupIndex: number;
+  product: LabelProduct;
   text: string;
   width: number;
   height: number;
@@ -90,6 +91,7 @@ export function resolveLabel(project: Project, label: Label): ResolvedLabel {
     groupId: label.groupId,
     groupName: group?.name ?? "Ungrouped",
     groupIndex: Math.max(0, groupIndex),
+    product: group?.product ?? "acrylic",
     text: label.text,
     width: label.width,
     height,

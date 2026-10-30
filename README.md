@@ -43,7 +43,7 @@ Select one or more labels, choose another label in **Attach selected to**, then 
 
 ## Preview
 
-**Print sheet** packs the labels onto A4, US Letter, or a custom page, with dimension lines and a 100 mm calibration bar. Each group starts on its own row, with the group name and height above its labels. The build plate still packs labels tightly, without those headings. The on-screen view is scaled to fit. The percentage is relative to a typical screen millimetre, not a promise about your display.
+**Print sheet** packs the labels onto A4, US Letter, or a custom page, with dimension lines and a 100 mm calibration bar. The project title and description are printed at the top of the first page. Each group starts on its own row, with the group name, label type, and height above its labels. A group can be a **Layered Acrylic Engraved Label**, a **Thermal Label**, or a **Die-cut PP Sticker**. The sticker has no outer frame, because the characters themselves are the die-cut piece. The build plate still packs labels tightly, without those headings. The on-screen view is scaled to fit. The percentage is relative to a typical screen millimetre, not a promise about your display.
 
 **Bed width** and **Bed length** set the build plate, in millimetres. Choosing a Snapmaker model fills both boxes. Typing in either box keeps your own size.
 

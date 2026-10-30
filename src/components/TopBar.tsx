@@ -14,7 +14,7 @@ import { ExportDialog } from "./ExportDialog";
 export function TopBar() {
   const { project, dispatch, setSelected } = useStore();
   const { ready, error, custom, addFontFile, removeFont, fonts } = useFonts();
-  const { resolved, arts, sheetPages, platePages } = useArtwork();
+  const { resolved, arts, sheetPages, platePages, banner } = useArtwork();
   const [svgOpen, setSvgOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [fontError, setFontError] = useState<string | null>(null);
@@ -37,11 +37,12 @@ export function TopBar() {
     setMessage(null);
     try {
       const dimensionFont = fonts.get(DIMENSION_FONT_ID) ?? fonts.get(FALLBACK_FONT_ID);
-      const pages = sheetPages.map((page) => ({
+      const pages = sheetPages.map((page, index) => ({
         svg: renderSheetSvg(page, project.sheet.width, project.sheet.height, arts, dimensionFont, {
           preview: false,
           showDimensions: project.sheet.showDimensions,
           showCalibration: project.sheet.showCalibration,
+          banner: index === 0 ? banner : null,
         }),
         width: project.sheet.width,
         height: project.sheet.height,
@@ -90,12 +91,22 @@ export function TopBar() {
           <span>1:1 millimetres</span>
         </div>
       </div>
-      <input
-        className="project-name"
-        aria-label="Project name"
-        value={project.name}
-        onChange={(event) => dispatch({ type: "rename", name: event.target.value })}
-      />
+      <div className="project-heading">
+        <input
+          className="project-name"
+          aria-label="Project name"
+          value={project.name}
+          onChange={(event) => dispatch({ type: "rename", name: event.target.value })}
+        />
+        <textarea
+          className="project-description"
+          aria-label="Project description"
+          rows={2}
+          placeholder="Description"
+          value={project.description}
+          onChange={(event) => dispatch({ type: "describe", description: event.target.value })}
+        />
+      </div>
       <div className="spacer" />
       <button type="button" className="btn" onClick={saveProject}>
         Save
