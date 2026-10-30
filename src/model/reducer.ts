@@ -8,6 +8,7 @@ import { inheritedHeight } from "./resolve";
 export type Action =
   | { type: "replace"; project: Project }
   | { type: "rename"; name: string }
+  | { type: "describe"; description: string }
   | { type: "setMasterHeight"; height: number | null }
   | { type: "updateGroup"; id: string; patch: Partial<Group> }
   | { type: "addGroup" }
@@ -61,6 +62,7 @@ export function makeGroup(project: Project): Group {
     radius: 0,
     tracking: 0,
     lineGap: 0.4,
+    product: "acrylic",
   };
 }
 
@@ -108,6 +110,8 @@ export function reducer(state: Project, action: Action): Project {
       return action.project;
     case "rename":
       return { ...state, name: action.name.slice(0, 80) };
+    case "describe":
+      return { ...state, description: action.description.slice(0, 400) };
     case "setMasterHeight": {
       if (action.height == null) return { ...state, masterHeight: null };
       const height = clamp(action.height, 1, 2000);

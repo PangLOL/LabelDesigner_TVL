@@ -1,4 +1,5 @@
-import type { Align, Follow, Group, Label, LabelLayout, LabelLine, LabelPiece, MachinePreset, OutlineMode, PaperPreset, Project, SheetSettings, PlateSettings, VAlign } from "../types";
+import type { Align, Follow, Group, Label, LabelLayout, LabelLine, LabelPiece, LabelProduct, MachinePreset, OutlineMode, PaperPreset, Project, SheetSettings, PlateSettings, VAlign } from "../types";
+import { labelProductId } from "../types";
 import { MACHINES, PAPER } from "../types";
 import { labelSummary, linesFromText, singleLayout } from "./compose";
 import { clamp } from "./format";
@@ -10,6 +11,7 @@ const VALIGNS = new Set<VAlign>(["top", "middle", "bottom"]);
 const PAPERS = new Set<PaperPreset>(["a4", "letter", "custom"]);
 const MACHINES_SET = new Set<MachinePreset>(["a350", "a250", "a150", "custom"]);
 const OUTLINES = new Set<OutlineMode>(["cut", "engrave"]);
+const PRODUCTS = new Set<LabelProduct>(["acrylic", "thermal", "die-cut-pp"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -50,6 +52,7 @@ function sanitizeGroup(value: unknown): Group | null {
     radius: num(value.radius, 0, 0, 200),
     tracking: num(value.tracking, 0, -5, 20),
     lineGap: num(value.lineGap, 0.4, 0, 40),
+    product: oneOf(value.product, PRODUCTS, labelProductId(typeof value.product === "string" ? value.product : "")),
   };
 }
 
@@ -154,6 +157,7 @@ export function sanitizeProject(value: unknown): Project | null {
   return {
     version: 1,
     name: str(value.name, "Labels").slice(0, 80) || "Labels",
+    description: str(value.description, "").slice(0, 400),
     masterHeight: numOrNull(value.masterHeight, 1, 2000),
     groups,
     labels,
@@ -167,6 +171,7 @@ export function blankProject(): Project {
   return {
     version: 1,
     name: "Labels",
+    description: "",
     masterHeight: null,
     groups: [
       {
@@ -181,6 +186,7 @@ export function blankProject(): Project {
         radius: 0,
         tracking: 0,
         lineGap: 0.4,
+        product: "acrylic",
       },
     ],
     labels: [],

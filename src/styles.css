@@ -79,16 +79,32 @@ h2 { margin: 0; font-size: 14px; font-weight: 500; }
 .brand span { display: block; color: var(--muted); font-family: var(--mono); font-size: 11px; }
 .mark { width: 22px; height: 22px; color: var(--accent); }
 
+.project-heading { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 220px; max-width: 440px; }
 .project-name {
   border: 0;
   background: transparent;
   font-size: 15px;
   font-weight: 500;
-  width: min(28ch, 30vw);
+  width: 100%;
   padding: 6px 8px;
   border-radius: 6px;
 }
-.project-name:hover, .project-name:focus { background: #efeae1; outline: none; }
+.project-description {
+  border: 0;
+  background: transparent;
+  resize: vertical;
+  min-height: 36px;
+  max-height: 88px;
+  width: 100%;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.project-name:hover, .project-name:focus, .project-description:hover, .project-description:focus { background: #efeae1; outline: none; }
+.product { max-width: 250px; font-size: 12px; }
 .spacer { flex: 1; min-width: 8px; }
 
 .btn, .lock, .follow-btn, .zoom button, .pager button, .text-btn, .pop-panel button, .font-row button, .bulk button, .row-actions button {
@@ -214,7 +230,7 @@ textarea.field {
   resize: vertical;
   line-height: 1.35;
 }
-.field:focus, .project-name:focus, .group-name:focus, textarea:focus {
+.field:focus, .project-name:focus, .project-description:focus, .group-name:focus, textarea:focus {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }

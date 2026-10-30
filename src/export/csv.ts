@@ -1,5 +1,5 @@
 import type { Align, Group, Label, LabelLayout, LabelLine, LabelPiece, MachinePreset, OutlineMode, PaperPreset, Project, VAlign } from "../types";
-import { MACHINES, PAPER } from "../types";
+import { MACHINES, PAPER, labelProductId, labelProductName } from "../types";
 import { formatMm } from "../model/format";
 import { BUILTIN_FONTS, FALLBACK_FONT_ID, fontName } from "../model/fonts";
 import { createId } from "../model/id";
@@ -38,6 +38,8 @@ const HEADERS = [
   "plate_gap_mm",
   "plate_outline",
   "plate_outline_mode",
+  "description",
+  "label_product",
 ];
 
 function csvCell(value: string | number | null | undefined): string {
@@ -110,6 +112,7 @@ export function projectToCsv(project: Project, custom: { id: string; name: strin
       plate_gap_mm: formatMm(project.plate.gap),
       plate_outline: yesNo(project.plate.outline),
       plate_outline_mode: project.plate.outlineMode,
+      description: project.description,
     }),
   );
   for (const group of project.groups) {
@@ -126,6 +129,7 @@ export function projectToCsv(project: Project, custom: { id: string; name: strin
         radius_mm: formatMm(group.radius),
         tracking_mm: formatMm(group.tracking),
         line_gap_mm: formatMm(group.lineGap),
+        label_product: labelProductName(group.product),
       }),
     );
   }
@@ -383,6 +387,7 @@ function draftGroup(name: string): DraftGroup {
     radius: 0,
     tracking: 0,
     lineGap: 0.4,
+    product: "acrylic",
     declared: false,
   };
 }
@@ -411,6 +416,7 @@ export function projectFromCsv(text: string, custom: { id: string; name: string 
   const cell = (row: string[], name: string) => raw(row, name).trim();
 
   let name = "Labels";
+  let description = "";
   let masterHeight: number | null = null;
   let sheetWidth = PAPER.a4.width;
   let sheetHeight = PAPER.a4.height;
@@ -443,6 +449,7 @@ export function projectFromCsv(text: string, custom: { id: string; name: string 
       sawProject = true;
       const title = cell(row, "text");
       if (title) name = title;
+      if (index.has("description")) description = raw(row, "description").replace(/^\s+|\s+$/g, "").slice(0, 400);
       if (index.has("master_height_mm")) masterHeight = readNum(cell(row, "master_height_mm"));
       const sheet = parseSize(cell(row, "sheet_mm"));
       if (sheet) {
@@ -485,6 +492,7 @@ export function projectFromCsv(text: string, custom: { id: string; name: string 
       if (tracking != null) group.tracking = tracking;
       const lineGap = readNum(cell(row, "line_gap_mm"));
       if (lineGap != null) group.lineGap = lineGap;
+      if (cell(row, "label_product")) group.product = labelProductId(cell(row, "label_product"));
       continue;
     }
     if (kind !== "label") continue;
@@ -542,6 +550,7 @@ export function projectFromCsv(text: string, custom: { id: string; name: string 
   return sanitizeProject({
     version: 1,
     name,
+    description,
     masterHeight,
     groups: groups.map((group) => ({
       id: group.id,
@@ -555,6 +564,7 @@ export function projectFromCsv(text: string, custom: { id: string; name: string 
       radius: group.radius,
       tracking: group.tracking,
       lineGap: group.lineGap,
+      product: group.product,
     })),
     labels,
     sheet: {

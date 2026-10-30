@@ -8,7 +8,7 @@ import { buildSvgZip } from "../export/download";
 import { renderLabelSvg, renderPlateSvg, renderSheetSvg } from "../export/svg";
 import { BUILTIN_FONTS } from "./fonts";
 import { formatNum, parseLabelList, roundedRectPath, transformPath } from "./format";
-import { paginate } from "./layout";
+import { paginate, sheetBanner } from "./layout";
 import { blankProject } from "./project";
 import { reducer } from "./reducer";
 import { resolveAll } from "./resolve";
@@ -49,6 +49,7 @@ function box(partial: Partial<ResolvedLabel> & Pick<ResolvedLabel, "text" | "wid
     heightSource: "label",
     typefaceSource: "label",
     fontSizeSource: "label",
+    product: partial.product ?? "acrylic",
   };
 }
 
@@ -121,6 +122,7 @@ describe("inheritance", () => {
     const project = {
       version: 1 as const,
       name: "Test",
+      description: "",
       masterHeight: null,
       groups: [
         {
@@ -135,6 +137,7 @@ describe("inheritance", () => {
           radius: 0,
           tracking: 0,
           lineGap: 0.4,
+          product: "acrylic" as const,
         },
       ],
       labels: [grouped, ownHeight, ownFace],
@@ -220,6 +223,49 @@ describe("paginate", () => {
     });
     expect(svg).toContain('data-group-heading="Power"');
     expect(svg).toContain('data-group-heading="Lights"');
+    expect(svg).toContain('data-group-product="Layered Acrylic Engraved Label"');
+  });
+
+  it("prints the title and description, and leaves a die-cut sticker without a frame", () => {
+    const acrylic = box({ id: "a", text: "ON", width: 30, height: 12, fontSize: 5, groupId: "g1", groupName: "Power", groupIndex: 0, product: "acrylic" });
+    const sticker = box({ id: "b", text: "UP", width: 30, height: 12, fontSize: 5, groupId: "g2", groupName: "Marks", groupIndex: 1, product: "die-cut-pp" });
+    const banner = sheetBanner(mono, "Door, west", "Night shift\nBay 2", 210, 14);
+    expect(banner.titleLines.map((line) => line.text)).toEqual(["Door, west"]);
+    expect(banner.descriptionLines.map((line) => line.text)).toEqual(["Night shift", "Bay 2"]);
+    expect(banner.contentTop).toBeGreaterThan(14);
+
+    const frame = { width: 210, height: 297, margin: 14, gap: 6, showDimensions: false, bottomInset: 14 };
+    const pages = paginate([acrylic, sticker], frame, { groupRows: true, firstPageTop: banner.contentTop });
+    expect(pages[0].headings[0]?.y).toBe(banner.contentTop);
+    expect(pages[0].placements[0]?.y).toBe(banner.contentTop + 8);
+    expect(pages[0].headings.map((heading) => heading.productName)).toEqual([
+      "Layered Acrylic Engraved Label",
+      "Die-cut PP Sticker",
+    ]);
+
+    const arts = new Map([
+      [acrylic.id, buildLabelArt(inter, acrylic)],
+      [sticker.id, buildLabelArt(inter, sticker)],
+    ]);
+    const svg = renderSheetSvg(pages[0], 210, 297, arts, mono, {
+      preview: false,
+      showDimensions: false,
+      showCalibration: false,
+      banner,
+    });
+    expect(svg).toContain('data-sheet-title="Door, west"');
+    expect(svg).toContain('data-sheet-description="Night shift\nBay 2"');
+    expect(svg).toContain('data-group-product="Die-cut PP Sticker"');
+    expect(svg.match(/label-edge/g)).toHaveLength(1);
+
+    const stickerArt = arts.get(sticker.id);
+    if (!stickerArt) throw new Error("missing sticker art");
+    const cut = renderLabelSvg(sticker, stickerArt, "mm", true, "cut", "outline");
+    const engrave = renderLabelSvg(sticker, stickerArt, "mm", true, "cut", "text");
+    expect(cut).not.toContain("label-edge");
+    expect(cut).toContain('stroke="#ff0000"');
+    expect(engrave).toContain('fill="#000000"');
+    expect(engrave).not.toContain("#ff0000");
   });
 });
 
@@ -248,9 +294,10 @@ describe("project csv", () => {
   it("opens a csv on another computer, including an older sheet and a combined label", () => {
     let project = blankProject();
     project = { ...project, name: "Door, west" };
+    project = reducer(project, { type: "describe", description: "Night shift" });
     project = reducer(project, { type: "setMasterHeight", height: 18 });
     const groupId = project.groups[0].id;
-    project = reducer(project, { type: "updateGroup", id: groupId, patch: { padding: 2, align: "left", masterTypefaceId: "noto-sans-cjk-tc-bold" } });
+    project = reducer(project, { type: "updateGroup", id: groupId, patch: { padding: 2, align: "left", masterTypefaceId: "noto-sans-cjk-tc-bold", product: "die-cut-pp" } });
     project = reducer(project, { type: "addLabel", groupId });
     project = reducer(project, { type: "addLabel", groupId });
     const [first, second] = project.labels;
@@ -265,6 +312,7 @@ describe("project csv", () => {
 
     const restored = projectFromCsv(projectToCsv(project, custom), custom);
     expect(restored?.name).toBe("Door, west");
+    expect(restored?.description).toBe("Night shift");
     expect(restored?.masterHeight).toBe(18);
     expect(restored?.groups[0]).toMatchObject({
       name: "Group 1",
@@ -272,6 +320,7 @@ describe("project csv", () => {
       masterTypefaceId: "noto-sans-cjk-tc-bold",
       padding: 2,
       align: "left",
+      product: "die-cut-pp",
     });
     expect(restored?.sheet).toMatchObject({ preset: "a4", width: 210, height: 297, margin: 11, gap: 5, showCalibration: false });
     expect(restored?.plate).toMatchObject({ preset: "a350", margin: 9, outlineMode: "engrave" });

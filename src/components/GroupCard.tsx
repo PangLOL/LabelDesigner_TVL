@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { Group, Label, LabelLine, LabelPiece } from "../types";
+import type { Group, Label, LabelLine, LabelPiece, LabelProduct } from "../types";
+import { LABEL_PRODUCTS } from "../types";
 import { orderedPieceIds, pieceText } from "../model/compose";
 import { fontName } from "../model/fonts";
 import { formatMm } from "../model/format";
@@ -37,6 +38,18 @@ export function GroupCard({ group, index }: { group: Group; index: number }) {
           value={group.name}
           onChange={(event) => dispatch({ type: "updateGroup", id: group.id, patch: { name: event.target.value } })}
         />
+        <select
+          className="field product"
+          aria-label={`${group.name} label type`}
+          value={group.product}
+          onChange={(event) => dispatch({ type: "updateGroup", id: group.id, patch: { product: event.target.value as LabelProduct } })}
+        >
+          {LABEL_PRODUCTS.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
         <span className="count">
           {labels.length} {labels.length === 1 ? "label" : "labels"}
         </span>

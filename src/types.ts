@@ -6,6 +6,28 @@ export type PaperPreset = "a4" | "letter" | "custom";
 export type MachinePreset = "a350" | "a250" | "a150" | "custom";
 export type OutlineMode = "cut" | "engrave";
 export type SvgUnit = "mm" | "luban72";
+export type LabelProduct = "acrylic" | "thermal" | "die-cut-pp";
+
+export const LABEL_PRODUCTS: { id: LabelProduct; name: string }[] = [
+  { id: "acrylic", name: "Layered Acrylic Engraved Label" },
+  { id: "thermal", name: "Thermal Label" },
+  { id: "die-cut-pp", name: "Die-cut PP Sticker" },
+];
+
+export function labelProductName(id: LabelProduct): string {
+  return LABEL_PRODUCTS.find((item) => item.id === id)?.name ?? LABEL_PRODUCTS[0].name;
+}
+
+export function labelProductId(value: string): LabelProduct {
+  const text = value.trim().toLowerCase();
+  const found = LABEL_PRODUCTS.find((item) => item.id === text || item.name.toLowerCase() === text);
+  return found?.id ?? "acrylic";
+}
+
+/** A die-cut sticker has no outer rectangle. The characters are the sticker. */
+export function isDieCut(product: LabelProduct | undefined): boolean {
+  return product === "die-cut-pp";
+}
 
 export interface Group {
   id: string;
@@ -22,6 +44,8 @@ export interface Group {
   tracking: number;
   /** Millimetres added between line boxes, on top of the font height. */
   lineGap: number;
+  /** How this group is made. Die-cut stickers have no outer frame. */
+  product: LabelProduct;
 }
 
 /** One row of lettering. A null size or alignment follows the label and the group. */
@@ -84,6 +108,8 @@ export interface PlateSettings {
 export interface Project {
   version: 1;
   name: string;
+  /** Printed under the title on the sheet. */
+  description: string;
   /** Live height for every grouped label that still follows its group. */
   masterHeight: number | null;
   groups: Group[];

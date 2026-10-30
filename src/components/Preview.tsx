@@ -13,7 +13,7 @@ const PX_PER_MM = 96 / 25.4;
 export function Preview() {
   const { project, dispatch, selected, toggleSelected, setSelected } = useStore();
   const { fonts } = useFonts();
-  const { resolved, arts, sheetPages, platePages, ready } = useArtwork();
+  const { resolved, arts, sheetPages, platePages, banner, ready } = useArtwork();
   const [mode, setMode] = useState<"sheet" | "plate">("sheet");
   const [pageIndex, setPageIndex] = useState(0);
   const [zoomMode, setZoomMode] = useState<"fit" | "fixed">("fit");
@@ -73,13 +73,14 @@ export function Preview() {
         showDimensions: project.sheet.showDimensions,
         showCalibration: project.sheet.showCalibration,
         selected,
+        banner: pageIndex === 0 ? banner : null,
       });
     }
     return renderPlateSvg(page, project.plate.width, project.plate.height, "mm", project.plate.outline, project.plate.outlineMode, arts, {
       preview: true,
       selected,
     });
-  }, [page, ready, mode, project.sheet, project.plate, arts, dimensionFont, selected, selectedKey]);
+  }, [page, pageIndex, ready, mode, project.sheet, project.plate, arts, dimensionFont, selected, selectedKey, banner]);
 
   const shown = Math.round((scale / PX_PER_MM) * 100);
   const overflow = resolved.filter((label) => arts.get(label.id)?.overflow).length;

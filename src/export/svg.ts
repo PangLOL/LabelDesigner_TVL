@@ -1,7 +1,7 @@
 import type { Font } from "opentype.js";
-import { LUBAN_UNITS_PER_MM, type OutlineMode, type SvgUnit } from "../types";
+import { LUBAN_UNITS_PER_MM, isDieCut, type OutlineMode, type SvgUnit } from "../types";
 import { escapeXml, formatMm, formatNum, slug, transformPath } from "../model/format";
-import type { LaidPage } from "../model/layout";
+import type { LaidPage, SheetBanner } from "../model/layout";
 import type { ResolvedLabel } from "../model/resolve";
 import type { LabelArt } from "../model/text";
 import { measureText, textPathAt } from "../model/text";
@@ -85,7 +85,11 @@ export function renderLabelSvg(
     `<!-- ${safeComment(`${label.text} · ${formatMm(label.width)} mm × ${formatMm(label.height)} mm · ${part === "outline" ? "cut outline" : part === "text" ? "filled lettering" : `${label.typefaceId} · font height ${formatMm(label.fontSize)} mm`}`)} -->`,
   ];
   if (part !== "outline") parts.push(`<path d="${transformPath(art.textPath, 0, 0, scale)}" fill="#000000" fill-rule="nonzero"/>`);
-  if (part === "outline" || (part === "both" && outline)) {
+  if ((part === "outline" || part === "both") && isDieCut(label.product)) {
+    parts.push(
+      `<path d="${transformPath(art.textPath, 0, 0, scale)}" fill="none" stroke="#ff0000" stroke-width="${formatNum(0.08 * scale)}" stroke-linejoin="round"/>`,
+    );
+  } else if (part === "outline" || (part === "both" && outline)) {
     const cut = part === "outline" || outlineMode === "cut";
     parts.push(edge(art, 0, 0, scale, cut ? "#ff0000" : stroke, (cut ? 0.08 : 0.15) * scale, false));
   }
@@ -136,7 +140,13 @@ export function renderPlateSvg(
     if (part !== "outline") {
       body.push(`<path d="${transformPath(art.textPath, placement.x, placement.y, scale)}" fill="#000000" fill-rule="nonzero"/>`);
     }
-    if (part === "outline" || (part === "both" && outline)) {
+    if (isDieCut(placement.label.product)) {
+      if (!options.preview && part !== "text") {
+        body.push(
+          `<path d="${transformPath(art.textPath, placement.x, placement.y, scale)}" fill="none" stroke="#ff0000" stroke-width="${formatNum(0.08 * scale)}" stroke-linejoin="round"/>`,
+        );
+      }
+    } else if (part === "outline" || (part === "both" && outline)) {
       const cut = part === "outline" || outlineMode === "cut";
       const strokeWidth = options.preview ? 1 : (cut ? 0.08 : 0.15) * scale;
       body.push(edge(art, placement.x, placement.y, scale, cut ? "#ff0000" : stroke, strokeWidth, options.preview));
@@ -159,18 +169,42 @@ export function renderSheetSvg(
   height: number,
   arts: ArtMap,
   dimensionFont: Font | undefined,
-  options: { preview: boolean; showDimensions: boolean; showCalibration: boolean; selected?: ReadonlySet<string> },
+  options: {
+    preview: boolean;
+    showDimensions: boolean;
+    showCalibration: boolean;
+    selected?: ReadonlySet<string>;
+    banner?: SheetBanner | null;
+  },
 ): string {
   const body: string[] = [];
   if (options.preview) {
     body.push(`<rect x="0" y="0" width="${formatNum(width)}" height="${formatNum(height)}" fill="#fffcf7"/>`);
   }
+  if (dimensionFont && options.banner) {
+    const banner = options.banner;
+    const x = banner.x;
+    if (banner.titleLines.length) {
+      body.push(`<g data-sheet-title="${escapeXml(banner.titleLines.map((line) => line.text).join(" "))}">`);
+      for (const line of banner.titleLines) {
+        body.push(`<path d="${textPathAt(dimensionFont, line.text, x, line.y, line.size)}" fill="#1b1914"/>`);
+      }
+      body.push("</g>");
+    }
+    if (banner.descriptionLines.length) {
+      body.push(`<g data-sheet-description="${escapeXml(banner.descriptionLines.map((line) => line.text).join("\n"))}">`);
+      for (const line of banner.descriptionLines) {
+        body.push(`<path d="${textPathAt(dimensionFont, line.text, x, line.y, line.size)}" fill="#3c3830"/>`);
+      }
+      body.push("</g>");
+    }
+  }
   if (dimensionFont) {
     for (const heading of page.headings ?? []) {
       const color = groupSwatch(heading.groupIndex);
-      const caption = `${heading.name}  ·  ${heading.heightText}`;
+      const caption = `${heading.name}  ·  ${heading.productName}  ·  ${heading.heightText}`;
       const baseline = heading.y + 4.4;
-      body.push(`<g data-group-heading="${escapeXml(heading.name)}">`);
+      body.push(`<g data-group-heading="${escapeXml(heading.name)}" data-group-product="${escapeXml(heading.productName)}">`);
       body.push(`<path d="${textPathAt(dimensionFont, caption, heading.x, baseline, 3.2)}" fill="${color}"/>`);
       const ruleY = baseline + 1.6;
       body.push(
@@ -193,7 +227,7 @@ export function renderSheetSvg(
       );
     }
     body.push(`<path d="${transformPath(art.textPath, placement.x, placement.y, 1)}" fill="#000000" fill-rule="nonzero"/>`);
-    body.push(edge(art, placement.x, placement.y, 1, "#000000", options.preview ? 1 : 0.12, options.preview));
+    if (!isDieCut(label.product)) body.push(edge(art, placement.x, placement.y, 1, "#000000", options.preview ? 1 : 0.12, options.preview));
     if (options.showDimensions && dimensionFont) {
       const dims = dimensionPaths(label, dimensionFont);
       body.push(
