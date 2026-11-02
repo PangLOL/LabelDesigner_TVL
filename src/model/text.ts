@@ -1,5 +1,5 @@
-import { Path, type Font, type Glyph } from "opentype.js";
-import type { LabelLayout } from "../types";
+import { Path, type Font, type Glyph, type PathCommand } from "opentype.js";
+import { isDieCut, type LabelLayout } from "../types";
 import { fontFor } from "./fonts";
 import { roundedRectPath, transformPath } from "./format";
 import type { ResolvedLabel, ResolvedPiece } from "./resolve";
@@ -12,6 +12,11 @@ export interface LabelArt {
   /** Ink bounds in label coordinates. Null when the label has no glyphs. */
   inkTop: number | null;
   inkBottom: number | null;
+  /**
+   * Die-cut stickers have no plate. Width and height are the lettering,
+   * and the sheet, PDF, and cut file use these instead of the label box.
+   */
+  dieCut?: { width: number; height: number };
 }
 
 export function capHeightMm(font: Font, fontSize: number): number | null {
@@ -145,7 +150,126 @@ function walkLayout(
   }
 }
 
+interface DieCutBlock {
+  width: number;
+  height: number;
+  path: Path;
+}
+
+function shiftCommand(command: PathCommand, dx: number, dy: number): PathCommand {
+  const next = { ...command } as PathCommand & { x?: number; y?: number; x1?: number; y1?: number; x2?: number; y2?: number };
+  if (next.x != null) next.x += dx;
+  if (next.y != null) next.y += dy;
+  if (next.x1 != null) next.x1 += dx;
+  if (next.y1 != null) next.y1 += dy;
+  if (next.x2 != null) next.x2 += dx;
+  if (next.y2 != null) next.y2 += dy;
+  return next;
+}
+
+function shiftPath(source: Path, dx: number, dy: number): Path {
+  const path = new Path();
+  for (const command of source.commands) path.commands.push(shiftCommand(command, dx, dy));
+  return path;
+}
+
+function extendPath(target: Path, source: Path): void {
+  for (const command of source.commands) target.commands.push({ ...command });
+}
+
+/** Empty die-cut still occupies the text height, with no rectangle to cut. */
+function emptyDieCut(textHeight: number): DieCutBlock {
+  const height = Math.max(1, textHeight);
+  return { width: Math.max(1, height * 0.35), height, path: new Path() };
+}
+
+function tighten(path: Path, textHeight: number): DieCutBlock {
+  if (path.commands.length === 0) return emptyDieCut(textHeight);
+  const box = path.getBoundingBox();
+  if (![box.x1, box.y1, box.x2, box.y2].every((value) => Number.isFinite(value))) return emptyDieCut(textHeight);
+  const width = Math.max(0.2, box.x2 - box.x1);
+  const height = Math.max(0.2, box.y2 - box.y1);
+  return { width, height, path: shiftPath(path, -box.x1, -box.y1) };
+}
+
+function dieCutPiece(font: Font, piece: ResolvedPiece, label: ResolvedLabel, missing: Set<string>): DieCutBlock {
+  const lines = piece.lines.filter((line) => line.text.length > 0);
+  const geoms = lines.map((line) => ({ line, geom: lineGeom(font, line.text, line.fontSize, label.tracking, missing) }));
+  const drawn = geoms.filter((item) => item.geom.path.commands.length > 0);
+  const textHeight = Math.max(label.fontSize, ...piece.lines.map((line) => line.fontSize));
+  if (drawn.length === 0) return emptyDieCut(textHeight);
+
+  const width = Math.max(...drawn.map((item) => item.geom.width), 0.2);
+  const baselines: number[] = [];
+  let cursor = 0;
+  drawn.forEach((item, index) => {
+    baselines.push(cursor);
+    cursor += item.line.fontSize + (index < drawn.length - 1 ? label.lineGap : 0);
+  });
+  const path = new Path();
+  drawn.forEach((item, index) => {
+    let x = (width - item.geom.width) / 2;
+    if (item.line.align === "left") x = 0;
+    if (item.line.align === "right") x = width - item.geom.width;
+    extendPath(path, shiftPath(item.geom.path, x, baselines[index]));
+  });
+  return tighten(path, textHeight);
+}
+
+function dieCutNode(
+  font: Font,
+  layout: LabelLayout,
+  pieces: Map<string, ResolvedPiece>,
+  label: ResolvedLabel,
+  missing: Set<string>,
+): DieCutBlock {
+  if (layout.kind === "piece") {
+    const piece = pieces.get(layout.pieceId);
+    return piece ? dieCutPiece(font, piece, label, missing) : emptyDieCut(label.fontSize);
+  }
+  const children = layout.children.map((child) => dieCutNode(font, child.node, pieces, label, missing));
+  if (children.length === 0) return emptyDieCut(label.fontSize);
+  const horizontal = layout.axis === "horizontal";
+  const width = horizontal ? children.reduce((sum, child) => sum + child.width, 0) : Math.max(...children.map((child) => child.width));
+  const height = horizontal ? Math.max(...children.map((child) => child.height)) : children.reduce((sum, child) => sum + child.height, 0);
+  const path = new Path();
+  let cursor = 0;
+  for (const child of children) {
+    const x = horizontal ? cursor : (width - child.width) / 2;
+    const y = horizontal ? (height - child.height) / 2 : cursor;
+    extendPath(path, shiftPath(child.path, x, y));
+    cursor += horizontal ? child.width : child.height;
+  }
+  return tighten(path, label.fontSize);
+}
+
+function buildDieCutArt(font: Font, label: ResolvedLabel): LabelArt {
+  const missing = new Set<string>();
+  const pieces = new Map((label.pieces ?? []).map((piece) => [piece.id, piece]));
+  const block = label.layout ? dieCutNode(font, label.layout, pieces, label, missing) : emptyDieCut(label.fontSize);
+  const hasInk = block.path.commands.length > 0;
+  return {
+    textPath: hasInk ? block.path.toPathData(3) : "",
+    borderPath: "",
+    overflow: false,
+    missing: [...missing],
+    inkTop: hasInk ? 0 : null,
+    inkBottom: hasInk ? block.height : null,
+    dieCut: { width: block.width, height: block.height },
+  };
+}
+
+/** Replace a die-cut label’s plate size with the measured lettering. */
+export function applyDieCutSize(labels: ResolvedLabel[], arts: Map<string, LabelArt>): ResolvedLabel[] {
+  return labels.map((label) => {
+    const size = arts.get(label.id)?.dieCut;
+    if (!isDieCut(label.product) || !size) return label;
+    return { ...label, width: size.width, height: size.height };
+  });
+}
+
 export function buildLabelArt(font: Font, label: ResolvedLabel): LabelArt {
+  if (isDieCut(label.product)) return buildDieCutArt(font, label);
   const missing = new Set<string>();
   const pad = Math.min(label.padding, Math.min(label.width, label.height) / 2);
   const content: Rect = {
@@ -185,7 +309,7 @@ export function buildArtMap(
 export function labelIssues(label: ResolvedLabel, art: LabelArt | undefined, oversized: boolean): string[] {
   const issues: string[] = [];
   if (!art) return issues;
-  if (art.overflow) issues.push("Text does not fit inside the label.");
+  if (art.overflow && !isDieCut(label.product)) issues.push("Text does not fit inside the label.");
   if (art.missing.length) issues.push(`Missing glyphs: ${art.missing.join(" ")}`);
   if (label.fontSize < 1.5) issues.push("Font height is under 1.5 mm. A Snapmaker laser may not hold the strokes.");
   if (oversized) issues.push("Label is larger than the page.");

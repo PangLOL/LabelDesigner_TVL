@@ -36,7 +36,7 @@ export function ExportDialog({
         <h2 id="svg-title">Snapmaker SVG</h2>
         <p>
           The download is a zip with two files for each label, both {project.plate.width} × {project.plate.height} mm on a plate file, or cropped tight for a single label.
-          <strong> engrave/</strong> is the lettering only, filled black, for a filled engrave. <strong> cut/</strong> is the label outline only, for a cut.
+          <strong> engrave/</strong> is the lettering only, filled black, for a filled engrave. <strong> cut/</strong> is the label outline only, for a cut. A die-cut PP sticker’s cut is the character outlines, with no rectangle.
           Import each file as its own operation.
         </p>
         <fieldset>

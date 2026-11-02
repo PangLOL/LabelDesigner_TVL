@@ -43,7 +43,7 @@ Select one or more labels, choose another label in **Attach selected to**, then 
 
 ## Preview
 
-**Print sheet** packs the labels onto A4, US Letter, or a custom page, with dimension lines and a 100 mm calibration bar. The project title and description are printed at the top of the first page. Each group starts on its own row, with the group name, label type, and height above its labels. A group can be a **Layered Acrylic Engraved Label**, a **Thermal Label**, or a **Die-cut PP Sticker**. The sticker has no outer frame, because the characters themselves are the die-cut piece. The build plate still packs labels tightly, without those headings. The on-screen view is scaled to fit. The percentage is relative to a typical screen millimetre, not a promise about your display.
+**Print sheet** packs the labels onto A4, US Letter, or a custom page, with dimension lines and a 100 mm calibration bar. The project title and description are printed at the top of the first page. Each group starts on its own row, with the group name, label type, and height above its labels. A group can be a **Layered Acrylic Engraved Label**, a **Thermal Label**, or a **Die-cut PP Sticker**. Acrylic and thermal labels keep an outer rectangle. A die-cut sticker does not: the cut is the outline of the characters, and the sheet sizes that sticker to the lettering. Its height is the text, not the group’s plate height. The build plate still packs labels tightly, without those headings. The on-screen view is scaled to fit. The percentage is relative to a typical screen millimetre, not a promise about your display.
 
 **Bed width** and **Bed length** set the build plate, in millimetres. Choosing a Snapmaker model fills both boxes. Typing in either box keeps your own size.
 
@@ -68,7 +68,7 @@ Red outlines are cut paths. Black lettering is meant to be engraved. Screen-only
 - **Luban 72 DPI** matches a drag onto the Luban canvas. The file name ends with the millimetre size, such as `01-on-32x12mm.svg`. If Luban shows a different size, select the object and type the width and height from the file name. Some Luban versions treat **File → Import** differently from dragging the file onto the canvas, so check the size either way.
 - **Millimetres** is the file to open in Inkscape, LightBurn, or Illustrator.
 
-Lettering is converted to filled paths, so Luban does not need the font installed. The engrave file has no border. The cut file has no lettering, and its path is red.
+Lettering is converted to filled paths, so Luban does not need the font installed. The engrave file has no border. The cut file has no lettering, and its path is red. A die-cut PP sticker’s cut file is the character outlines, with no rectangle, and the file size is the lettering.
 
 A plate file is the full bed. If Luban crops to the artwork bounds, set the object to the bed size in the file name, or import the individual label files.
 
