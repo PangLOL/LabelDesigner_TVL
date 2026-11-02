@@ -153,7 +153,11 @@ export function renderPlateSvg(
     } else if (options.preview) {
       body.push(edge(art, placement.x, placement.y, scale, "#b7ad9c", 1, true));
     }
-    if (selected) {
+    if (selected && isDieCut(placement.label.product)) {
+      body.push(
+        `<path d="${transformPath(art.textPath, placement.x, placement.y, scale)}" fill="none" stroke="#c4491d" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`,
+      );
+    } else if (selected) {
       body.push(
         `<rect class="selection" x="${formatNum(placement.x - 0.8)}" y="${formatNum(placement.y - 0.8)}" width="${formatNum(placement.label.width + 1.6)}" height="${formatNum(placement.label.height + 1.6)}" fill="none" stroke="#c4491d" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`,
       );
@@ -235,7 +239,11 @@ export function renderSheetSvg(
       );
       body.push(`<path d="${transformPath(dims.text, placement.x, placement.y, 1)}" fill="${color}"/>`);
     }
-    if (selected) {
+    if (selected && isDieCut(label.product)) {
+      body.push(
+        `<path d="${transformPath(art.textPath, placement.x, placement.y, 1)}" fill="none" stroke="#c4491d" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`,
+      );
+    } else if (selected) {
       body.push(
         `<rect class="selection" x="${formatNum(placement.x - 0.7)}" y="${formatNum(placement.y - 0.7)}" width="${formatNum(label.width + 1.4)}" height="${formatNum(label.height + 1.4)}" fill="none" stroke="#c4491d" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`,
       );

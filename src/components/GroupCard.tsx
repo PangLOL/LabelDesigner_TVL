@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Group, Label, LabelLine, LabelPiece, LabelProduct } from "../types";
-import { LABEL_PRODUCTS } from "../types";
+import { LABEL_PRODUCTS, isDieCut } from "../types";
 import { orderedPieceIds, pieceText } from "../model/compose";
 import { fontName } from "../model/fonts";
 import { formatMm } from "../model/format";
@@ -64,7 +64,11 @@ export function GroupCard({ group, index }: { group: Group; index: number }) {
       <div className="masters">
         <div>
           <span className="field-label">Height</span>
-          {heightLocked ? (
+          {isDieCut(group.product) ? (
+            <p className="locked-value">
+              Lettering <em>No frame</em>
+            </p>
+          ) : heightLocked ? (
             <p className="locked-value">
               {formatMm(project.masterHeight ?? 0)} mm <em>Project</em>
             </p>
@@ -126,6 +130,7 @@ export function GroupCard({ group, index }: { group: Group; index: number }) {
             <span className="unit">mm</span>
           </div>
           <CapNote typefaceId={group.masterTypefaceId ?? "inter"} fontSize={group.masterFontSize ?? 5} fonts={fonts} />
+          {isDieCut(group.product) && <p className="cap">No outer frame. The cut is the outline of the letters.</p>}
         </div>
       </div>
 
@@ -335,34 +340,52 @@ function LabelRow({
         ) : (
           <p className="summary">{label.text || "Combined label"}</p>
         )}
-        <div className="metric">
-          <MmInput
-            label={`Width of ${label.text || "label"}`}
-            value={label.width}
-            min={1}
-            max={2000}
-            onChange={(width) => dispatch({ type: "updateLabel", id: label.id, patch: { width } })}
+        {isDieCut(resolved.product) ? (
+          <div className="metric">
+            <span className="follow-read" title="Width of the lettering">
+              {formatMm(resolved.width)}
+            </span>
+            <span className="unit">mm</span>
+          </div>
+        ) : (
+          <div className="metric">
+            <MmInput
+              label={`Width of ${label.text || "label"}`}
+              value={label.width}
+              min={1}
+              max={2000}
+              onChange={(width) => dispatch({ type: "updateLabel", id: label.id, patch: { width } })}
+            />
+            <span className="unit">mm</span>
+          </div>
+        )}
+        {isDieCut(resolved.product) ? (
+          <div className="follow">
+            <span className="follow-read" title="Height of the lettering">
+              {formatMm(resolved.height)}
+            </span>
+            <span className="unit">mm</span>
+          </div>
+        ) : (
+          <Measure
+            linked={resolved.heightSource !== "label"}
+            value={resolved.height}
+            label={`Height of ${label.text || "label"}`}
+            followLabel={resolved.heightSource === "project" ? "Using the project height. Set this label alone." : "Using the group height. Set this label alone."}
+            ownLabel="Using this label’s height. Follow the group again."
+            onToggle={() =>
+              dispatch({
+                type: "updateLabel",
+                id: label.id,
+                patch:
+                  label.heightMode === "group"
+                    ? { heightMode: "custom", height: resolved.height }
+                    : { heightMode: "group" },
+              })
+            }
+            onChange={(height) => dispatch({ type: "updateLabel", id: label.id, patch: { height, heightMode: "custom" } })}
           />
-          <span className="unit">mm</span>
-        </div>
-        <Measure
-          linked={resolved.heightSource !== "label"}
-          value={resolved.height}
-          label={`Height of ${label.text || "label"}`}
-          followLabel={resolved.heightSource === "project" ? "Using the project height. Set this label alone." : "Using the group height. Set this label alone."}
-          ownLabel="Using this label’s height. Follow the group again."
-          onToggle={() =>
-            dispatch({
-              type: "updateLabel",
-              id: label.id,
-              patch:
-                label.heightMode === "group"
-                  ? { heightMode: "custom", height: resolved.height }
-                  : { heightMode: "group" },
-            })
-          }
-          onChange={(height) => dispatch({ type: "updateLabel", id: label.id, patch: { height, heightMode: "custom" } })}
-        />
+        )}
         <div className="face-cell">
           {resolved.typefaceSource === "group" ? (
             <span className="follow-read" title={fontName(resolved.typefaceId, custom)}>

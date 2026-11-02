@@ -7,13 +7,13 @@ import { isLabelCsv, projectFromCsv, projectToCsv } from "../export/csv";
 import { buildSvgZip } from "../export/download";
 import { renderLabelSvg, renderPlateSvg, renderSheetSvg } from "../export/svg";
 import { BUILTIN_FONTS } from "./fonts";
-import { formatNum, parseLabelList, roundedRectPath, transformPath } from "./format";
+import { formatMm, formatNum, parseLabelList, roundedRectPath, transformPath } from "./format";
 import { paginate, sheetBanner } from "./layout";
 import { blankProject } from "./project";
 import { reducer } from "./reducer";
 import { resolveAll } from "./resolve";
 import { joinLayouts, joinedSize, orderedPieceIds, separateParts } from "./compose";
-import { buildLabelArt } from "./text";
+import { applyDieCutSize, buildLabelArt } from "./text";
 import type { ResolvedLabel } from "./resolve";
 import type { Label } from "../types";
 import type { Font } from "opentype.js";
@@ -266,6 +266,56 @@ describe("paginate", () => {
     expect(cut).toContain('stroke="#ff0000"');
     expect(engrave).toContain('fill="#000000"');
     expect(engrave).not.toContain("#ff0000");
+  });
+
+  it("sizes a die-cut sticker to the lettering and draws no rectangle", () => {
+    const sticker = box({
+      text: "350KPa",
+      width: 40,
+      height: 20,
+      fontSize: 20,
+      padding: 1.4,
+      product: "die-cut-pp",
+    });
+    const art = buildLabelArt(inter, sticker);
+    expect(art.overflow).toBe(false);
+    expect(art.borderPath).toBe("");
+    expect(art.dieCut).toBeDefined();
+    if (!art.dieCut) return;
+    expect(art.dieCut.width).toBeGreaterThan(40);
+    expect(art.dieCut.height).toBeLessThan(20);
+    expect(art.dieCut.height).toBeGreaterThan(10);
+
+    const sized = applyDieCutSize([sticker], new Map([[sticker.id, art]]))[0];
+    expect(sized.width).toBe(art.dieCut.width);
+    expect(sized.height).toBe(art.dieCut.height);
+
+    const frame = { width: 210, height: 297, margin: 14, gap: 6, showDimensions: true, bottomInset: 14 };
+    const pages = paginate([sized], frame, { groupRows: true });
+    const sheet = renderSheetSvg(pages[0], 210, 297, new Map([[sticker.id, art]]), mono, {
+      preview: false,
+      showDimensions: true,
+      showCalibration: false,
+    });
+    expect(sheet).not.toContain("label-edge");
+    expect(sheet).not.toContain("<rect");
+    expect(sheet).toContain(`350KPa — ${formatMm(sized.width)} × ${formatMm(sized.height)} mm`);
+
+    const cut = renderLabelSvg(sized, art, "mm", true, "cut", "outline");
+    expect(cut).not.toContain("label-edge");
+    expect(cut).not.toContain("<rect");
+    expect(cut).toContain(`width="${formatNum(sized.width)}mm"`);
+    expect(cut).toContain(`height="${formatNum(sized.height)}mm"`);
+    expect(cut).toContain('stroke="#ff0000"');
+
+    const selected = renderSheetSvg(pages[0], 210, 297, new Map([[sticker.id, art]]), mono, {
+      preview: true,
+      showDimensions: false,
+      showCalibration: false,
+      selected: new Set([sticker.id]),
+    });
+    expect(selected).not.toContain('class="selection"');
+    expect(selected).toContain('stroke="#c4491d"');
   });
 });
 
