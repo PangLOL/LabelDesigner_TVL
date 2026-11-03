@@ -8,7 +8,7 @@ import { buildSvgZip } from "../export/download";
 import { renderLabelSvg, renderPlateSvg, renderSheetSvg } from "../export/svg";
 import { BUILTIN_FONTS } from "./fonts";
 import { formatMm, formatNum, parseLabelList, roundedRectPath, transformPath } from "./format";
-import { paginate, sheetBanner } from "./layout";
+import { GROUP_BAND, QTY_BAND, paginate, sheetBanner } from "./layout";
 import { blankProject } from "./project";
 import { reducer } from "./reducer";
 import { resolveAll } from "./resolve";
@@ -50,6 +50,7 @@ function box(partial: Partial<ResolvedLabel> & Pick<ResolvedLabel, "text" | "wid
     typefaceSource: "label",
     fontSizeSource: "label",
     product: partial.product ?? "acrylic",
+    quantity: partial.quantity ?? 1,
   };
 }
 
@@ -67,6 +68,7 @@ function leaf(id: string, text: string, width: number, height: number): Label {
     fontSizeMode: "custom",
     pieces: [{ id: `${id}-piece`, lines: [{ text, fontSize: null, align: null }] }],
     layout: { kind: "piece", pieceId: `${id}-piece` },
+    quantity: 1,
   };
 }
 
@@ -226,6 +228,25 @@ describe("paginate", () => {
     expect(svg).toContain('data-group-product="Layered Acrylic Engraved Label"');
   });
 
+  it("prints the quantity above the label and leaves that room on the sheet", () => {
+    const label = box({ id: "on", text: "ON", width: 30, height: 12, fontSize: 5, quantity: 4 });
+    const frame = { width: 200, height: 120, margin: 10, gap: 4, showDimensions: false, bottomInset: 10 };
+    const pages = paginate([label], frame, { groupRows: true, showQuantity: true });
+    expect(pages[0].placements[0]?.y).toBe(10 + GROUP_BAND + QTY_BAND);
+    const svg = renderSheetSvg(pages[0], 200, 120, new Map([[label.id, buildLabelArt(inter, label)]]), mono, {
+      preview: false,
+      showDimensions: false,
+      showCalibration: false,
+      showQuantity: true,
+    });
+    expect(svg).toContain('data-label-qty="4"');
+    expect(svg).toContain("qty 4");
+    const plate = paginate([label], frame);
+    expect(plate[0].placements[0]?.y).toBe(10);
+    const plateSvg = renderPlateSvg(plate[0], 200, 120, "mm", true, "cut", new Map([[label.id, buildLabelArt(inter, label)]]), { preview: false, part: "text" });
+    expect(plateSvg).not.toContain("data-label-qty");
+  });
+
   it("prints the title and description, and leaves a die-cut sticker without a frame", () => {
     const acrylic = box({ id: "a", text: "ON", width: 30, height: 12, fontSize: 5, groupId: "g1", groupName: "Power", groupIndex: 0, product: "acrylic" });
     const sticker = box({ id: "b", text: "UP", width: 30, height: 12, fontSize: 5, groupId: "g2", groupName: "Marks", groupIndex: 1, product: "die-cut-pp" });
@@ -354,6 +375,7 @@ describe("project csv", () => {
     project = reducer(project, { type: "setPieceText", labelId: first.id, pieceId: first.pieces[0].id, text: "UP\nDOWN" });
     project = reducer(project, { type: "updateLine", labelId: first.id, pieceId: first.pieces[0].id, index: 0, patch: { fontSize: 4, align: "left" } });
     project = reducer(project, { type: "updateLabel", id: second.id, patch: { width: 22, text: "SIDE" } });
+    project = reducer(project, { type: "updateLabel", id: first.id, patch: { quantity: 6 } });
     project = reducer(project, { type: "setPieceText", labelId: second.id, pieceId: second.pieces[0].id, text: "SIDE" });
     project = reducer(project, { type: "combine", targetId: first.id, guestIds: [second.id], edge: "right" });
     project = reducer(project, { type: "setSheet", patch: { margin: 11, gap: 5, showCalibration: false } });
@@ -375,6 +397,7 @@ describe("project csv", () => {
     expect(restored?.sheet).toMatchObject({ preset: "a4", width: 210, height: 297, margin: 11, gap: 5, showCalibration: false });
     expect(restored?.plate).toMatchObject({ preset: "a350", margin: 9, outlineMode: "engrave" });
     expect(restored?.labels).toHaveLength(1);
+    expect(restored?.labels[0]?.quantity).toBe(6);
     const label = restored?.labels[0];
     expect(label?.width).toBe(62);
     expect(label?.height).toBe(18);
@@ -411,6 +434,7 @@ describe("project csv", () => {
       fontSizeMode: "group",
     });
     expect(opened?.labels[0].pieces[0].lines.map((line) => line.text)).toEqual(["充電座", "座"]);
+    expect(opened?.labels[0]?.quantity).toBe(1);
     expect(opened?.groups[0].masterFontSize).toBe(12);
   });
 });

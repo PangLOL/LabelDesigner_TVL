@@ -59,6 +59,8 @@ export interface LaidPage {
 
 /** Vertical room for a group name and its height, before that group's labels. */
 export const GROUP_BAND = 8;
+/** Room above a label for the printed quantity. Sheet and PDF only. */
+export const QTY_BAND = 4.5;
 
 export function frameBottomInset(margin: number, calibrate: boolean): number {
   return calibrate ? Math.max(margin, 16) : margin;
@@ -137,8 +139,9 @@ export function sheetBanner(font: Font | undefined, title: string, description: 
   return { contentTop: Math.max(margin, baseline + 2.4), x: margin, titleLines: titles, descriptionLines: descriptions };
 }
 
-export function paginate(labels: ResolvedLabel[], frame: Frame, options?: { groupRows?: boolean; firstPageTop?: number }): LaidPage[] {
+export function paginate(labels: ResolvedLabel[], frame: Frame, options?: { groupRows?: boolean; firstPageTop?: number; showQuantity?: boolean }): LaidPage[] {
   const groupRows = options?.groupRows ?? false;
+  const showQuantity = options?.showQuantity ?? false;
   const box = {
     left: frame.margin,
     top: frame.margin,
@@ -179,11 +182,13 @@ export function paginate(labels: ResolvedLabel[], frame: Frame, options?: { grou
   };
 
   for (const label of labels) {
-    const cell = cellSize(label, frame.showDimensions);
+    const measured = cellSize(label, frame.showDimensions);
+    const qty = showQuantity ? QTY_BAND : 0;
+    const cell = { width: measured.width, height: measured.height + qty };
     const fits = cell.width <= contentW + 0.01 && cell.height <= contentH + 0.01 && contentW > 1 && contentH > 1;
     if (!fits) {
       if (placements.length || headings.length) commit();
-      placements.push({ label, x: box.left, y: pageTop, oversized: true });
+      placements.push({ label, x: box.left, y: pageTop + qty, oversized: true });
       commit();
       lastGroup = label.groupId;
       continue;
@@ -217,7 +222,7 @@ export function paginate(labels: ResolvedLabel[], frame: Frame, options?: { grou
       }
     }
 
-    placements.push({ label, x, y, oversized: false });
+    placements.push({ label, x, y: y + qty, oversized: false });
     x += cell.width + frame.gap;
     rowHeight = Math.max(rowHeight, cell.height);
     lastGroup = label.groupId;

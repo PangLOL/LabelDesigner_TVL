@@ -80,9 +80,16 @@ export function makeLabel(project: Project, group: Group, text = "", width = 40)
     typefaceMode: "group",
     fontSize: group.masterFontSize ?? 5,
     fontSizeMode: "group",
+    quantity: 1,
     pieces: [{ id: pieceId, lines: linesFromText(text) }],
     layout: singleLayout(pieceId),
   });
+}
+
+function applyLabelPatch(label: Label, patch: Partial<Label>): Label {
+  const next = { ...label, ...patch };
+  if (patch.quantity != null) next.quantity = clamp(Math.round(patch.quantity), 1, 99);
+  return next;
 }
 
 function copyLabel(label: Label, groupId = label.groupId): Label {
@@ -160,7 +167,7 @@ export function reducer(state: Project, action: Action): Project {
     case "updateLabel":
       return {
         ...state,
-        labels: state.labels.map((label) => (label.id === action.id ? { ...label, ...action.patch } : label)),
+        labels: state.labels.map((label) => (label.id === action.id ? applyLabelPatch(label, action.patch) : label)),
       };
     case "deleteLabels": {
       const ids = new Set(action.ids);
@@ -277,7 +284,7 @@ export function reducer(state: Project, action: Action): Project {
       const ids = new Set(action.ids);
       return {
         ...state,
-        labels: state.labels.map((label) => (ids.has(label.id) ? { ...label, ...action.patch } : label)),
+        labels: state.labels.map((label) => (ids.has(label.id) ? applyLabelPatch(label, action.patch) : label)),
       };
     }
     case "setSheet":

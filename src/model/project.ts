@@ -117,6 +117,7 @@ function sanitizeLabel(value: unknown, groupIds: Set<string>): Label | null {
     typefaceMode: oneOf(value.typefaceMode, FOLLOWS, "group"),
     fontSize: num(value.fontSize, 5, 0.8, 400),
     fontSizeMode: oneOf(value.fontSizeMode, FOLLOWS, "group"),
+    quantity: Math.round(num(value.quantity, 1, 1, 99)),
     pieces: composition.pieces,
     layout: composition.layout,
   };

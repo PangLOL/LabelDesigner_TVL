@@ -177,6 +177,7 @@ export function renderSheetSvg(
     preview: boolean;
     showDimensions: boolean;
     showCalibration: boolean;
+    showQuantity?: boolean;
     selected?: ReadonlySet<string>;
     banner?: SheetBanner | null;
   },
@@ -224,7 +225,13 @@ export function renderSheetSvg(
     const selected = options.selected?.has(label.id) ?? false;
     const color = groupSwatch(label.groupIndex);
     body.push(`<g data-label-id="${escapeXml(label.id)}"${selected ? ` class="is-selected"` : ""}>`);
-    body.push(`<title>${escapeXml(`${label.text || "Empty"} — ${formatMm(label.width)} × ${formatMm(label.height)} mm`)}</title>`);
+    const quantity = label.quantity ?? 1;
+    body.push(`<title>${escapeXml(`${label.text || "Empty"} — ${formatMm(label.width)} × ${formatMm(label.height)} mm · qty ${quantity}`)}</title>`);
+    if (options.showQuantity && dimensionFont) {
+      body.push(`<g data-label-qty="${quantity}">`);
+      body.push(`<path d="${textPathAt(dimensionFont, `× ${quantity}`, placement.x, placement.y - 1.15, 3.2)}" fill="${color}"/>`);
+      body.push("</g>");
+    }
     if (options.preview) {
       body.push(
         `<rect class="hit" x="${formatNum(placement.x)}" y="${formatNum(placement.y)}" width="${formatNum(label.width)}" height="${formatNum(label.height)}" fill="transparent"/>`,
