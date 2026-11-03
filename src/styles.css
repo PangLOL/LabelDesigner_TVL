@@ -284,7 +284,7 @@ textarea.field {
 
 .table-head, .row {
   display: grid;
-  grid-template-columns: 22px minmax(90px, 1.2fr) 76px 108px minmax(140px, 1fr) 108px 78px 72px;
+  grid-template-columns: 22px minmax(80px, 1.1fr) 72px 104px minmax(120px, 1fr) 104px 80px 112px;
   gap: 6px;
   align-items: center;
 }
@@ -315,7 +315,8 @@ textarea.field {
   font-variant-numeric: tabular-nums;
   font-size: 13px;
 }
-.row-actions { justify-content: flex-end; }
+.row-actions { justify-content: flex-end; gap: 0; }
+.row-actions button { padding: 0 5px; }
 .issue {
   margin: 0 4px 8px 28px;
   color: var(--warn);
