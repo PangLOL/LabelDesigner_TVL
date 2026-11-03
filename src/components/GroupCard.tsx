@@ -183,6 +183,7 @@ export function GroupCard({ group, index }: { group: Group; index: number }) {
         <span>Height</span>
         <span>Typeface</span>
         <span>Font height</span>
+        <span>Qty</span>
         <span />
       </div>
       {labels.length === 0 && <p className="empty">No labels in this group yet.</p>}
@@ -433,6 +434,25 @@ function LabelRow({
           }
           onChange={(fontSize) => dispatch({ type: "updateLabel", id: label.id, patch: { fontSize, fontSizeMode: "custom" } })}
         />
+        <div className="qty" role="group" aria-label={`Quantity of ${label.text || "label"}`}>
+          <button
+            type="button"
+            aria-label={`Decrease quantity of ${label.text || "label"}`}
+            disabled={label.quantity <= 1}
+            onClick={() => dispatch({ type: "updateLabel", id: label.id, patch: { quantity: label.quantity - 1 } })}
+          >
+            −
+          </button>
+          <span>{label.quantity}</span>
+          <button
+            type="button"
+            aria-label={`Increase quantity of ${label.text || "label"}`}
+            disabled={label.quantity >= 99}
+            onClick={() => dispatch({ type: "updateLabel", id: label.id, patch: { quantity: label.quantity + 1 } })}
+          >
+            +
+          </button>
+        </div>
         <div className="row-actions">
           <button type="button" aria-label="Move up" onClick={() => dispatch({ type: "reorderLabel", id: label.id, direction: -1 })}>
             ↑

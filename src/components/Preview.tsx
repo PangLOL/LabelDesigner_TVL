@@ -72,6 +72,7 @@ export function Preview() {
         preview: true,
         showDimensions: project.sheet.showDimensions,
         showCalibration: project.sheet.showCalibration,
+        showQuantity: true,
         selected,
         banner: pageIndex === 0 ? banner : null,
       });

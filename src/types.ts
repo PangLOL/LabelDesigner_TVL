@@ -81,6 +81,8 @@ export interface Label {
   typefaceMode: Follow;
   fontSize: number;
   fontSizeMode: Follow;
+  /** How many of this label to make. Printed on the sheet, not cut. */
+  quantity: number;
   pieces: LabelPiece[];
   layout: LabelLayout;
 }

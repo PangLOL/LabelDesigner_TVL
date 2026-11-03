@@ -25,6 +25,7 @@ export interface ResolvedLabel {
   height: number;
   typefaceId: string;
   fontSize: number;
+  quantity: number;
   padding: number;
   align: Group["align"];
   vAlign: Group["vAlign"];
@@ -97,6 +98,7 @@ export function resolveLabel(project: Project, label: Label): ResolvedLabel {
     height,
     typefaceId,
     fontSize,
+    quantity: label.quantity,
     padding: group?.padding ?? 1.2,
     align,
     vAlign: group?.vAlign ?? "middle",

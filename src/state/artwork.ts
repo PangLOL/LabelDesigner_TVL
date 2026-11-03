@@ -15,7 +15,7 @@ export function useArtwork() {
     const resolved = applyDieCutSize(drafted, arts);
     const frame = sheetFrame(project);
     const banner = sheetBanner(fonts.get(DIMENSION_FONT_ID) ?? fonts.get(FALLBACK_FONT_ID), project.name, project.description, frame.width, frame.margin);
-    const sheetPages = paginate(resolved, frame, { groupRows: true, firstPageTop: banner.contentTop });
+    const sheetPages = paginate(resolved, frame, { groupRows: true, firstPageTop: banner.contentTop, showQuantity: true });
     const platePages = paginate(resolved, plateFrame(project));
     const oversized = (pages: typeof sheetPages) =>
       new Set(pages.flatMap((page) => page.placements.filter((item) => item.oversized).map((item) => item.label.id)));

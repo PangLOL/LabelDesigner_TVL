@@ -42,6 +42,7 @@ export function TopBar() {
           preview: false,
           showDimensions: project.sheet.showDimensions,
           showCalibration: project.sheet.showCalibration,
+          showQuantity: true,
           banner: index === 0 ? banner : null,
         }),
         width: project.sheet.width,

@@ -40,6 +40,7 @@ const HEADERS = [
   "plate_outline_mode",
   "description",
   "label_product",
+  "quantity",
 ];
 
 function csvCell(value: string | number | null | undefined): string {
@@ -157,6 +158,7 @@ export function projectToCsv(project: Project, custom: { id: string; name: strin
         tracking_mm: formatMm(resolved.tracking),
         line_gap_mm: formatMm(resolved.lineGap),
         layout: layoutCell(label),
+        quantity: label.quantity,
       }),
     );
   }
@@ -543,6 +545,7 @@ export function projectFromCsv(text: string, custom: { id: string; name: string 
       fontSizeMode: isOwn(fontFrom) ? "custom" : "group",
       pieces: composition.pieces,
       layout: composition.layout,
+      quantity: index.has("quantity") ? Math.round(readNum(cell(row, "quantity")) ?? 1) : 1,
     });
   }
 
