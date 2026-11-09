@@ -29,6 +29,32 @@ export function isDieCut(product: LabelProduct | undefined): boolean {
   return product === "die-cut-pp";
 }
 
+/** Layered acrylic and thermal labels have a plate. Die-cut PP does not. */
+export function hasPlate(product: LabelProduct | undefined): boolean {
+  return product === "acrylic" || product === "thermal";
+}
+
+/** White sheet, white plate, black lettering. Matches a sheet exported before colours existed. */
+export const DEFAULT_BACKGROUND_COLOR = "#ffffff";
+export const DEFAULT_PLATE_COLOR = "#ffffff";
+export const DEFAULT_TEXT_COLOR = "#000000";
+
+/** `#rgb` or `#rrggbb`. Anything else is rejected so a sheet cannot store a named or functional colour. */
+export function parseHex(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  const full = /^#([0-9a-fA-F]{6})$/.exec(text);
+  if (full) return `#${full[1].toLowerCase()}`;
+  const short = /^#([0-9a-fA-F]{3})$/.exec(text);
+  if (!short) return null;
+  const [r, g, b] = short[1];
+  return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+}
+
+export function normalizeHex(value: unknown, fallback: string): string {
+  return parseHex(value) ?? fallback;
+}
+
 export interface Group {
   id: string;
   name: string;
@@ -46,6 +72,12 @@ export interface Group {
   lineGap: number;
   /** How this group is made. Die-cut stickers have no outer frame. */
   product: LabelProduct;
+  /** Fill behind this group's block on the print sheet and PDF. Not the rest of the page. */
+  backgroundColor: string;
+  /** Body colour of the label plate. Stored for every group, and applied only when the product has a plate. */
+  plateColor: string;
+  /** Colour of the lettering in this group. */
+  textColor: string;
 }
 
 /** One row of lettering. A null size or alignment follows the label and the group. */

@@ -8,8 +8,8 @@ import { buildSvgZip } from "../export/download";
 import { renderLabelSvg, renderPlateSvg, renderSheetSvg } from "../export/svg";
 import { BUILTIN_FONTS } from "./fonts";
 import { formatMm, formatNum, parseLabelList, roundedRectPath, transformPath } from "./format";
-import { GROUP_BAND, QTY_BAND, paginate, sheetBanner } from "./layout";
-import { blankProject } from "./project";
+import { GROUP_BAND, QTY_BAND, groupSections, paginate, sheetBanner } from "./layout";
+import { blankProject, sanitizeProject } from "./project";
 import { reducer } from "./reducer";
 import { resolveAll } from "./resolve";
 import { joinLayouts, joinedSize, orderedPieceIds, separateParts } from "./compose";
@@ -51,6 +51,9 @@ function box(partial: Partial<ResolvedLabel> & Pick<ResolvedLabel, "text" | "wid
     fontSizeSource: "label",
     product: partial.product ?? "acrylic",
     quantity: partial.quantity ?? 1,
+    backgroundColor: partial.backgroundColor ?? "#ffffff",
+    plateColor: partial.plateColor ?? "#ffffff",
+    textColor: partial.textColor ?? "#000000",
   };
 }
 
@@ -140,6 +143,9 @@ describe("inheritance", () => {
           tracking: 0,
           lineGap: 0.4,
           product: "acrylic" as const,
+          backgroundColor: "#fff1cc",
+          plateColor: "#1f4b99",
+          textColor: "#f4f1ea",
         },
       ],
       labels: [grouped, ownHeight, ownFace],
@@ -149,7 +155,15 @@ describe("inheritance", () => {
     const on = resolveAll(project).find((label) => label.id === "on");
     const hold = resolveAll(project).find((label) => label.id === "hold");
     const fuse = resolveAll(project).find((label) => label.id === "fuse");
-    expect(on).toMatchObject({ height: 12, heightSource: "group", fontSize: 5, typefaceId: "inter-semibold" });
+    expect(on).toMatchObject({
+      height: 12,
+      heightSource: "group",
+      fontSize: 5,
+      typefaceId: "inter-semibold",
+      backgroundColor: "#fff1cc",
+      plateColor: "#1f4b99",
+      textColor: "#f4f1ea",
+    });
     expect(hold).toMatchObject({ height: 18, heightSource: "label", fontSizeSource: "group" });
     expect(fuse).toMatchObject({ height: 12, typefaceId: "inter-semibold", typefaceSource: "label", fontSize: 4.5 });
 
@@ -436,6 +450,240 @@ describe("project csv", () => {
     expect(opened?.labels[0].pieces[0].lines.map((line) => line.text)).toEqual(["充電座", "座"]);
     expect(opened?.labels[0]?.quantity).toBe(1);
     expect(opened?.groups[0].masterFontSize).toBe(12);
+    expect(opened?.groups[0]).toMatchObject({ backgroundColor: "#ffffff", plateColor: "#ffffff", textColor: "#000000" });
+  });
+
+  it("round-trips maker colours and leaves the plate blank for die-cut PP", () => {
+    let project = blankProject();
+    const acrylicId = project.groups[0].id;
+    project = reducer(project, {
+      type: "updateGroup",
+      id: acrylicId,
+      patch: { product: "thermal", backgroundColor: "#112233", plateColor: "#abcdef", textColor: "#445566" },
+    });
+    project = reducer(project, { type: "addGroup" });
+    const stickerId = project.groups[1].id;
+    project = reducer(project, {
+      type: "updateGroup",
+      id: stickerId,
+      patch: { product: "die-cut-pp", backgroundColor: "#ddeecc", plateColor: "#ff00aa", textColor: "#101010" },
+    });
+    const csv = projectToCsv(project);
+    expect(csv).toContain("background_colour,plate_colour,text_colour");
+    expect(csv).toContain("#112233");
+    expect(csv).toContain("#abcdef");
+    expect(csv).toContain("#ddeecc");
+    expect(csv).not.toContain("#ff00aa");
+
+    const restored = projectFromCsv(csv);
+    expect(restored?.groups[0]).toMatchObject({
+      product: "thermal",
+      backgroundColor: "#112233",
+      plateColor: "#abcdef",
+      textColor: "#445566",
+    });
+    expect(restored?.groups[1]).toMatchObject({
+      product: "die-cut-pp",
+      backgroundColor: "#ddeecc",
+      plateColor: "#ffffff",
+      textColor: "#101010",
+    });
+
+    const american = [
+      "record,group,label_product,background_color,plate_color,text_color",
+      "group,Power,Layered Acrylic Engraved Label,#abc,#123456,#010203",
+      "group,Marks,Die-cut PP Sticker,#445566,#ff00aa,#0a0a0a",
+    ].join("\n");
+    const opened = projectFromCsv(american);
+    expect(opened?.groups[0]).toMatchObject({ backgroundColor: "#aabbcc", plateColor: "#123456", textColor: "#010203" });
+    expect(opened?.groups[1]).toMatchObject({ product: "die-cut-pp", backgroundColor: "#445566", plateColor: "#ffffff", textColor: "#0a0a0a" });
+  });
+
+  it("opens the FSD sheet, which has no colour columns, as black lettering on white", () => {
+    const opened = projectFromCsv(FSD_SHEET);
+    expect(opened?.name).toBe("FSD MFV");
+    expect(opened?.description).toBe("This are the drafted labels for FSD MRVs.");
+    expect(opened?.groups.map((group) => [group.name, group.product, group.backgroundColor, group.plateColor, group.textColor])).toEqual([
+      ["Group 1", "acrylic", "#ffffff", "#ffffff", "#000000"],
+      ["Group 3", "die-cut-pp", "#ffffff", "#ffffff", "#000000"],
+    ]);
+    expect(opened?.labels).toHaveLength(7);
+    const saved = sanitizeProject(JSON.parse(JSON.stringify(opened)));
+    expect(saved?.groups[0].backgroundColor).toBe("#ffffff");
+    const coloured = sanitizeProject({
+      ...saved,
+      groups: saved?.groups.map((group, index) =>
+        index === 0
+          ? { ...group, backgroundColor: "red", plateColor: "#abc", textColor: "#445566" }
+          : { ...group, backgroundColor: "#e7f2ea", plateColor: "#ff00aa", textColor: "navy" },
+      ),
+    });
+    expect(coloured?.groups[0]).toMatchObject({ backgroundColor: "#ffffff", plateColor: "#aabbcc", textColor: "#445566" });
+    expect(coloured?.groups[1]).toMatchObject({ backgroundColor: "#e7f2ea", plateColor: "#ff00aa", textColor: "#000000" });
+  });
+});
+
+const FSD_SHEET = `record,group,text,width_mm,height_mm,height_from,typeface,typeface_from,font_height_mm,font_height_from,lines,line_font_mm,line_align,padding_mm,align,vertical,radius_mm,tracking_mm,line_gap_mm,sheet_mm,plate_mm,master_height_mm,layout,sheet_margin_mm,sheet_gap_mm,sheet_dimensions,sheet_calibration,plate_margin_mm,plate_gap_mm,plate_outline,plate_outline_mode,description,label_product,quantity
+project,,FSD MFV,,,,,,,,,,,,,,,,,210 x 297,320 x 350,,,14,6,yes,yes,8,4,yes,cut,This are the drafted labels for FSD MRVs.,,
+group,Group 1,,,20,,Noto Sans CJK TC Bold,,12,,,,,1.4,center,middle,0,0,0.4,,,,,,,,,,,,,,Layered Acrylic Engraved Label,
+group,Group 3,,,16.24,,Noto Sans CJK TC Bold,,16.24,,,,,1.4,center,middle,0,0,0.4,,,,,,,,,,,,,,Die-cut PP Sticker,
+label,Group 1,櫃門鎖,45,20,group,Noto Sans CJK TC Bold,group,12,group,櫃門鎖,,,1.4,center,middle,0,0,0.4,,,,p0,,,,,,,,,,,2
+label,Group 1,先鎖後開尾門,80,20,group,Noto Sans CJK TC Bold,group,12,group,先鎖後開尾門,,,1.4,center,middle,0,0,0.4,,,,p0,,,,,,,,,,,1
+label,Group 1,充電座,45,20,group,Noto Sans CJK TC Bold,group,12,group,充電座,,,1.4,center,middle,0,0,0.4,,,,p0,,,,,,,,,,,1
+label,Group 1,無鉛汽油,55,20,group,Noto Sans CJK TC Bold,group,12,group,無鉛汽油,,,1.4,center,middle,0,0,0.4,,,,p0,,,,,,,,,,,1
+label,Group 1,電池總制在內,80,20,group,Noto Sans CJK TC Bold,group,12,group,電池總制在內,,,1.4,center,middle,0,0,0.4,,,,p0,,,,,,,,,,,1
+label,Group 3,280kPa,69.7,16.24,group,Noto Sans CJK TC Bold,group,16.24,group,280kPa,,,1.4,center,middle,0,0,0.4,,,,p0,,,,,,,,,,,2
+label,Group 3,350kPa,69.88,16.24,group,Noto Sans CJK TC Bold,group,16.24,group,350kPa,,,1.4,center,middle,0,0,0.4,,,,p0,,,,,,,,,,,2
+`;
+
+describe("maker colours", () => {
+  it("fills each group section on the sheet and paints a plate only for acrylic and thermal", () => {
+    const acrylic = box({
+      id: "a",
+      text: "ON",
+      width: 30,
+      height: 12,
+      fontSize: 5,
+      groupId: "g1",
+      groupName: "Group 1",
+      groupIndex: 0,
+      product: "acrylic",
+      backgroundColor: "#fff1cc",
+      plateColor: "#1f4b99",
+      textColor: "#f4f1ea",
+    });
+    const thermal = box({
+      id: "t",
+      text: "HOT",
+      width: 30,
+      height: 12,
+      fontSize: 5,
+      groupId: "g2",
+      groupName: "Group 2",
+      groupIndex: 1,
+      product: "thermal",
+      backgroundColor: "#f3d2cf",
+      plateColor: "#8a3010",
+      textColor: "#1c1b17",
+    });
+    const sticker = box({
+      id: "b",
+      text: "UP",
+      width: 30,
+      height: 12,
+      fontSize: 5,
+      groupId: "g3",
+      groupName: "Group 3",
+      groupIndex: 2,
+      product: "die-cut-pp",
+      backgroundColor: "#e7f2ea",
+      plateColor: "#ff00aa",
+      textColor: "#143028",
+    });
+    const banner = sheetBanner(mono, "FSD MFV", "Draft", 210, 14);
+    const frame = { width: 210, height: 297, margin: 14, gap: 6, showDimensions: true, bottomInset: 16 };
+    const pages = paginate([acrylic, thermal, sticker], frame, { groupRows: true, firstPageTop: banner.contentTop, showQuantity: true });
+    const sections = groupSections(pages[0], 210, { showDimensions: true, showQuantity: true });
+    expect(sections.map((section) => section.groupId)).toEqual(["g1", "g2", "g3"]);
+    expect(sections[0].y).toBe(banner.contentTop);
+    expect(sections[0].x).toBe(14);
+    expect(sections[0].width).toBe(182);
+    expect(sections[0].height).toBeLessThan(80);
+    expect(sections[0].y + sections[0].height).toBeLessThan(sections[1].y);
+    expect(sections[1].y + sections[1].height).toBeLessThan(sections[2].y);
+    expect(sections[2].y + sections[2].height).toBeLessThan(297);
+
+    const arts = new Map([
+      [acrylic.id, buildLabelArt(inter, acrylic)],
+      [thermal.id, buildLabelArt(inter, thermal)],
+      [sticker.id, buildLabelArt(inter, sticker)],
+    ]);
+    const svg = renderSheetSvg(pages[0], 210, 297, arts, mono, {
+      preview: false,
+      showDimensions: true,
+      showCalibration: true,
+      showQuantity: true,
+      banner,
+    });
+    expect(svg).toContain('fill="#fff1cc"');
+    expect(svg).toContain('fill="#f3d2cf"');
+    expect(svg).toContain('fill="#e7f2ea"');
+    expect(svg.match(/class="label-plate"/g)).toHaveLength(2);
+    expect(svg).toContain('fill="#1f4b99"');
+    expect(svg).toContain('fill="#8a3010"');
+    expect(svg).toContain('fill="#f4f1ea"');
+    expect(svg).toContain('fill="#143028"');
+    expect(svg).not.toContain("#ff00aa");
+    expect(svg).not.toContain('data-section-y="0"');
+    expect(svg).toContain('data-section-width="182"');
+    expect(svg).toContain('data-section-height="');
+    const plateCut = renderPlateSvg(pages[0], 320, 350, "mm", true, "cut", arts, { preview: false, part: "outline" });
+    expect(plateCut).not.toContain("label-plate");
+    expect(plateCut).not.toContain("#1f4b99");
+  });
+
+  it("prints the FSD sheet as red acrylic on white plates and white die-cut lettering on black", () => {
+    const acrylic = box({
+      id: "lock",
+      text: "櫃門鎖",
+      width: 45,
+      height: 20,
+      fontSize: 12,
+      groupId: "g1",
+      groupName: "Group 1",
+      groupIndex: 0,
+      product: "acrylic",
+      backgroundColor: "#ff0000",
+      plateColor: "#ffffff",
+      textColor: "#ff0000",
+    });
+    const sticker = box({
+      id: "kpa",
+      text: "280kPa",
+      width: 70,
+      height: 16,
+      fontSize: 16,
+      groupId: "g3",
+      groupName: "Group 3",
+      groupIndex: 1,
+      product: "die-cut-pp",
+      backgroundColor: "#000000",
+      plateColor: "#ff00aa",
+      textColor: "#ffffff",
+    });
+    const banner = sheetBanner(mono, "FSD MFV", "This are the drafted labels for FSD MRVs.", 210, 14);
+    const frame = { width: 210, height: 297, margin: 14, gap: 6, showDimensions: true, bottomInset: 16 };
+    const pages = paginate([acrylic, sticker], frame, { groupRows: true, firstPageTop: banner.contentTop, showQuantity: true });
+    const sections = groupSections(pages[0], 210, { showDimensions: true, showQuantity: true });
+    expect(sections.map((section) => section.name)).toEqual(["Group 1", "Group 3"]);
+    expect(sections[0].y).toBeGreaterThan(0);
+    expect(sections[0].width).toBe(182);
+    expect(sections[0].y + sections[0].height).toBeLessThan(sections[1].y);
+    expect(sections[1].y + sections[1].height).toBeLessThan(297);
+
+    const arts = new Map([
+      [acrylic.id, buildLabelArt(inter, acrylic)],
+      [sticker.id, buildLabelArt(inter, sticker)],
+    ]);
+    const svg = renderSheetSvg(pages[0], 210, 297, arts, mono, {
+      preview: false,
+      showDimensions: true,
+      showCalibration: true,
+      showQuantity: true,
+      banner,
+    });
+    expect(svg).toMatch(/data-group-name="Group 1"[^>]*fill="#ff0000"/);
+    expect(svg).toMatch(/data-group-name="Group 3"[^>]*fill="#000000"/);
+    expect(svg.match(/class="label-plate"/g)).toHaveLength(1);
+    expect(svg).toMatch(/class="label-plate"[^>]*fill="#ffffff"/);
+    expect(svg).not.toContain("#ff00aa");
+    const acrylicInk = svg.slice(svg.indexOf('data-label-id="lock"'), svg.indexOf('data-label-id="kpa"'));
+    const stickerInk = svg.slice(svg.indexOf('data-label-id="kpa"'));
+    expect(acrylicInk).toContain('fill="#ffffff"');
+    expect(acrylicInk).toContain('fill="#ff0000"');
+    expect(stickerInk).not.toContain("label-plate");
+    expect(stickerInk).toContain('fill="#ffffff"');
+    expect(stickerInk).not.toContain('fill="#ff0000"');
   });
 });
 

@@ -1,4 +1,5 @@
 import type { Align, Group, Label, LabelLayout, LabelProduct, Project } from "../types";
+import { DEFAULT_BACKGROUND_COLOR, DEFAULT_PLATE_COLOR, DEFAULT_TEXT_COLOR } from "../types";
 
 export type HeightSource = "project" | "group" | "label";
 export type FieldSource = "group" | "label";
@@ -32,6 +33,9 @@ export interface ResolvedLabel {
   radius: number;
   tracking: number;
   lineGap: number;
+  backgroundColor: string;
+  plateColor: string;
+  textColor: string;
   pieces: ResolvedPiece[];
   layout: LabelLayout;
   heightSource: HeightSource;
@@ -105,6 +109,9 @@ export function resolveLabel(project: Project, label: Label): ResolvedLabel {
     radius: group?.radius ?? 0,
     tracking: group?.tracking ?? 0,
     lineGap: group?.lineGap ?? 0.4,
+    backgroundColor: group?.backgroundColor ?? DEFAULT_BACKGROUND_COLOR,
+    plateColor: group?.plateColor ?? DEFAULT_PLATE_COLOR,
+    textColor: group?.textColor ?? DEFAULT_TEXT_COLOR,
     pieces: label.pieces.map((piece) => ({
       id: piece.id,
       lines: piece.lines.map((line) => ({
