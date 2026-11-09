@@ -1,5 +1,6 @@
 import type { Align, Group, Label, LabelLayout, LabelLine, LabelPiece, MachinePreset, OutlineMode, PaperPreset, Project, VAlign } from "../types";
 import { DEFAULT_BACKGROUND_COLOR, DEFAULT_PLATE_COLOR, DEFAULT_TEXT_COLOR, MACHINES, PAPER, hasPlate, labelProductId, labelProductName, normalizeHex } from "../types";
+import { groupSwatch } from "../palette";
 import { formatMm } from "../model/format";
 import { BUILTIN_FONTS, FALLBACK_FONT_ID, fontName } from "../model/fonts";
 import { createId } from "../model/id";
@@ -44,6 +45,7 @@ const HEADERS = [
   "background_colour",
   "plate_colour",
   "text_colour",
+  "dimension_colour",
 ];
 
 function csvCell(value: string | number | null | undefined): string {
@@ -137,6 +139,7 @@ export function projectToCsv(project: Project, custom: { id: string; name: strin
         background_colour: group.backgroundColor,
         plate_colour: hasPlate(group.product) ? group.plateColor : "",
         text_colour: group.textColor,
+        dimension_colour: group.dimensionColor,
       }),
     );
   }
@@ -382,7 +385,7 @@ interface DraftGroup extends Group {
   declared: boolean;
 }
 
-function draftGroup(name: string): DraftGroup {
+function draftGroup(name: string, index: number): DraftGroup {
   return {
     id: createId(),
     name: name.slice(0, 80) || "Group",
@@ -399,6 +402,7 @@ function draftGroup(name: string): DraftGroup {
     backgroundColor: DEFAULT_BACKGROUND_COLOR,
     plateColor: DEFAULT_PLATE_COLOR,
     textColor: DEFAULT_TEXT_COLOR,
+    dimensionColor: groupSwatch(index),
     declared: false,
   };
 }
@@ -450,7 +454,7 @@ export function projectFromCsv(text: string, custom: { id: string; name: string 
     const groupName = value.trim().slice(0, 80) || "Group";
     const existing = groups.find((group) => group.name === groupName && (!declared || !group.declared));
     if (existing) return existing;
-    const created = draftGroup(groupName);
+    const created = draftGroup(groupName, groups.length);
     groups.push(created);
     return created;
   };
@@ -513,6 +517,8 @@ export function projectFromCsv(text: string, custom: { id: string; name: string 
         const plate = colourOf(row, "plate_colour", "plate_color");
         if (plate) group.plateColor = normalizeHex(plate, group.plateColor);
       }
+      const dimension = colourOf(row, "dimension_colour", "dimension_color");
+      if (dimension) group.dimensionColor = normalizeHex(dimension, group.dimensionColor);
       continue;
     }
     if (kind !== "label") continue;
@@ -589,6 +595,7 @@ export function projectFromCsv(text: string, custom: { id: string; name: string 
       backgroundColor: group.backgroundColor,
       plateColor: group.plateColor,
       textColor: group.textColor,
+      dimensionColor: group.dimensionColor,
     })),
     labels,
     sheet: {

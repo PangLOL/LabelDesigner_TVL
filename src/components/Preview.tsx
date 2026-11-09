@@ -281,7 +281,7 @@ export function Preview() {
         </p>
         <p>
           {mode === "sheet"
-            ? "The PDF is this print sheet at 1:1, including each group's background, plate, and text colours. Print it at 100% and check the bar."
+            ? "The PDF is this print sheet at 1:1, including each group's background, plate, text, and dimension colours. Print it at 100% and check the bar."
             : "Snapmaker SVG saves two files for each label: filled lettering to engrave, and the outline to cut. Bed width and length set the plate file."}
         </p>
         {overflow > 0 && (

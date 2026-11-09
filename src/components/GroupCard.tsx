@@ -155,11 +155,17 @@ export function GroupCard({ group, index }: { group: Group; index: number }) {
           value={group.textColor}
           onChange={(textColor) => dispatch({ type: "updateGroup", id: group.id, patch: { textColor } })}
         />
+        <ColourField
+          caption="Dimension"
+          label={`${group.name} dimension colour`}
+          value={group.dimensionColor}
+          onChange={(dimensionColor) => dispatch({ type: "updateGroup", id: group.id, patch: { dimensionColor } })}
+        />
       </div>
       <p className="cap">
         {hasPlate(group.product)
-          ? "Background fills this group on the PDF. Plate is the label body. Text is the lettering."
-          : "Background fills this group on the PDF. Text is the lettering. Die-cut PP has no plate."}
+          ? "Background fills this group on the PDF. Plate is the label body. Text is the lettering. Dimension paints the sizes, the quantity, and the group heading."
+          : "Background fills this group on the PDF. Text is the lettering. Die-cut PP has no plate. Dimension paints the sizes, the quantity, and the group heading."}
       </p>
 
       <details className="spacing">

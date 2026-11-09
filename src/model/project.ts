@@ -1,6 +1,7 @@
 import type { Align, Follow, Group, Label, LabelLayout, LabelLine, LabelPiece, LabelProduct, MachinePreset, OutlineMode, PaperPreset, Project, SheetSettings, PlateSettings, VAlign } from "../types";
 import { DEFAULT_BACKGROUND_COLOR, DEFAULT_PLATE_COLOR, DEFAULT_TEXT_COLOR, labelProductId, normalizeHex } from "../types";
 import { MACHINES, PAPER } from "../types";
+import { groupSwatch } from "../palette";
 import { labelSummary, linesFromText, singleLayout } from "./compose";
 import { clamp } from "./format";
 import { createId } from "./id";
@@ -38,7 +39,7 @@ function oneOf<T extends string>(value: unknown, allowed: Set<T>, fallback: T): 
   return typeof value === "string" && allowed.has(value as T) ? (value as T) : fallback;
 }
 
-function sanitizeGroup(value: unknown): Group | null {
+function sanitizeGroup(value: unknown, index: number): Group | null {
   if (!isRecord(value) || typeof value.id !== "string") return null;
   return {
     id: value.id,
@@ -56,6 +57,7 @@ function sanitizeGroup(value: unknown): Group | null {
     backgroundColor: normalizeHex(value.backgroundColor, DEFAULT_BACKGROUND_COLOR),
     plateColor: normalizeHex(value.plateColor, DEFAULT_PLATE_COLOR),
     textColor: normalizeHex(value.textColor, DEFAULT_TEXT_COLOR),
+    dimensionColor: normalizeHex(value.dimensionColor, groupSwatch(index)),
   };
 }
 
@@ -130,7 +132,9 @@ function sanitizeLabel(value: unknown, groupIds: Set<string>): Label | null {
 
 export function sanitizeProject(value: unknown): Project | null {
   if (!isRecord(value) || value.version !== 1) return null;
-  const groups = Array.isArray(value.groups) ? value.groups.map(sanitizeGroup).filter((group): group is Group => group !== null) : [];
+  const groups = Array.isArray(value.groups)
+    ? value.groups.map((group, index) => sanitizeGroup(group, index)).filter((group): group is Group => group !== null)
+    : [];
   if (groups.length === 0) return null;
   const groupIds = new Set(groups.map((group) => group.id));
   const labels = Array.isArray(value.labels)
@@ -194,6 +198,7 @@ export function blankProject(): Project {
         backgroundColor: DEFAULT_BACKGROUND_COLOR,
         plateColor: DEFAULT_PLATE_COLOR,
         textColor: DEFAULT_TEXT_COLOR,
+        dimensionColor: groupSwatch(0),
       },
     ],
     labels: [],

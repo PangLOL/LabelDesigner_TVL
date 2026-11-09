@@ -1,5 +1,6 @@
 import type { Align, Group, Label, LabelLayout, LabelProduct, Project } from "../types";
 import { DEFAULT_BACKGROUND_COLOR, DEFAULT_PLATE_COLOR, DEFAULT_TEXT_COLOR } from "../types";
+import { groupSwatch } from "../palette";
 
 export type HeightSource = "project" | "group" | "label";
 export type FieldSource = "group" | "label";
@@ -36,6 +37,7 @@ export interface ResolvedLabel {
   backgroundColor: string;
   plateColor: string;
   textColor: string;
+  dimensionColor: string;
   pieces: ResolvedPiece[];
   layout: LabelLayout;
   heightSource: HeightSource;
@@ -112,6 +114,7 @@ export function resolveLabel(project: Project, label: Label): ResolvedLabel {
     backgroundColor: group?.backgroundColor ?? DEFAULT_BACKGROUND_COLOR,
     plateColor: group?.plateColor ?? DEFAULT_PLATE_COLOR,
     textColor: group?.textColor ?? DEFAULT_TEXT_COLOR,
+    dimensionColor: group?.dimensionColor ?? groupSwatch(Math.max(0, groupIndex)),
     pieces: label.pieces.map((piece) => ({
       id: piece.id,
       lines: piece.lines.map((line) => ({
