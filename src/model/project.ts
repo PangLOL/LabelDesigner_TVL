@@ -1,5 +1,5 @@
 import type { Align, Follow, Group, Label, LabelLayout, LabelLine, LabelPiece, LabelProduct, MachinePreset, OutlineMode, PaperPreset, Project, SheetSettings, PlateSettings, VAlign } from "../types";
-import { labelProductId } from "../types";
+import { DEFAULT_BACKGROUND_COLOR, DEFAULT_PLATE_COLOR, DEFAULT_TEXT_COLOR, labelProductId, normalizeHex } from "../types";
 import { MACHINES, PAPER } from "../types";
 import { labelSummary, linesFromText, singleLayout } from "./compose";
 import { clamp } from "./format";
@@ -53,6 +53,9 @@ function sanitizeGroup(value: unknown): Group | null {
     tracking: num(value.tracking, 0, -5, 20),
     lineGap: num(value.lineGap, 0.4, 0, 40),
     product: oneOf(value.product, PRODUCTS, labelProductId(typeof value.product === "string" ? value.product : "")),
+    backgroundColor: normalizeHex(value.backgroundColor, DEFAULT_BACKGROUND_COLOR),
+    plateColor: normalizeHex(value.plateColor, DEFAULT_PLATE_COLOR),
+    textColor: normalizeHex(value.textColor, DEFAULT_TEXT_COLOR),
   };
 }
 
@@ -188,6 +191,9 @@ export function blankProject(): Project {
         tracking: 0,
         lineGap: 0.4,
         product: "acrylic",
+        backgroundColor: DEFAULT_BACKGROUND_COLOR,
+        plateColor: DEFAULT_PLATE_COLOR,
+        textColor: DEFAULT_TEXT_COLOR,
       },
     ],
     labels: [],

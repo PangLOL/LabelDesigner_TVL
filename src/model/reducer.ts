@@ -1,4 +1,5 @@
 import type { Edge, Group, Label, LabelLine, PlateSettings, Project, SheetSettings } from "../types";
+import { DEFAULT_BACKGROUND_COLOR, DEFAULT_PLATE_COLOR, DEFAULT_TEXT_COLOR } from "../types";
 import { attachEdgeCross, attachEdgeSpan, cloneComposition, joinLayouts, joinedSize, linesFromText, pieceById, replacePiece, separateParts, singleLayout, withSummary } from "./compose";
 import type { ParsedLabelRow } from "./format";
 import { clamp } from "./format";
@@ -63,6 +64,9 @@ export function makeGroup(project: Project): Group {
     tracking: 0,
     lineGap: 0.4,
     product: "acrylic",
+    backgroundColor: DEFAULT_BACKGROUND_COLOR,
+    plateColor: DEFAULT_PLATE_COLOR,
+    textColor: DEFAULT_TEXT_COLOR,
   };
 }
 

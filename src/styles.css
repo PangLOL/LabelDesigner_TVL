@@ -200,6 +200,35 @@ h2 { margin: 0; font-size: 14px; font-weight: 500; }
   gap: 12px;
   margin-bottom: 8px;
 }
+.colours {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+  align-items: flex-end;
+  margin: 4px 0 2px;
+}
+.colour {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.colour-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.colour-control input[type="color"] {
+  width: 32px;
+  height: 30px;
+  padding: 2px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--white);
+  cursor: pointer;
+}
+.colour-hex { width: 92px; }
 .field-label, .preview-tools > label, .spacing-grid > label, .bulk form label, .bulk > label {
   display: flex;
   flex-direction: column;

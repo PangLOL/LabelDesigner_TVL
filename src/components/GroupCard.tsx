@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Group, Label, LabelLine, LabelPiece, LabelProduct } from "../types";
-import { LABEL_PRODUCTS, isDieCut } from "../types";
+import { LABEL_PRODUCTS, hasPlate, isDieCut } from "../types";
 import { orderedPieceIds, pieceText } from "../model/compose";
 import { fontName } from "../model/fonts";
 import { formatMm } from "../model/format";
@@ -12,7 +12,7 @@ import { useArtwork } from "../state/artwork";
 import type { CustomFont } from "../state/fonts";
 import { useFonts } from "../state/fonts";
 import { useStore } from "../state/store";
-import { FollowButton, FontSelect, MmInput } from "./fields";
+import { ColourField, FollowButton, FontSelect, MmInput } from "./fields";
 
 export function GroupCard({ group, index }: { group: Group; index: number }) {
   const { project, dispatch, selected, setSelected } = useStore();
@@ -133,6 +133,34 @@ export function GroupCard({ group, index }: { group: Group; index: number }) {
           {isDieCut(group.product) && <p className="cap">No outer frame. The cut is the outline of the letters.</p>}
         </div>
       </div>
+
+      <div className="colours" data-testid="group-colours">
+        <ColourField
+          caption="Background"
+          label={`${group.name} background colour`}
+          value={group.backgroundColor}
+          onChange={(backgroundColor) => dispatch({ type: "updateGroup", id: group.id, patch: { backgroundColor } })}
+        />
+        {hasPlate(group.product) && (
+          <ColourField
+            caption="Plate"
+            label={`${group.name} plate colour`}
+            value={group.plateColor}
+            onChange={(plateColor) => dispatch({ type: "updateGroup", id: group.id, patch: { plateColor } })}
+          />
+        )}
+        <ColourField
+          caption="Text"
+          label={`${group.name} text colour`}
+          value={group.textColor}
+          onChange={(textColor) => dispatch({ type: "updateGroup", id: group.id, patch: { textColor } })}
+        />
+      </div>
+      <p className="cap">
+        {hasPlate(group.product)
+          ? "Background fills this group on the PDF. Plate is the label body. Text is the lettering."
+          : "Background fills this group on the PDF. Text is the lettering. Die-cut PP has no plate."}
+      </p>
 
       <details className="spacing">
         <summary>Inset, alignment, corners</summary>

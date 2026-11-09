@@ -1,5 +1,5 @@
 import type { Align, Group, Label, LabelLayout, LabelLine, LabelPiece, MachinePreset, OutlineMode, PaperPreset, Project, VAlign } from "../types";
-import { MACHINES, PAPER, labelProductId, labelProductName } from "../types";
+import { DEFAULT_BACKGROUND_COLOR, DEFAULT_PLATE_COLOR, DEFAULT_TEXT_COLOR, MACHINES, PAPER, hasPlate, labelProductId, labelProductName, normalizeHex } from "../types";
 import { formatMm } from "../model/format";
 import { BUILTIN_FONTS, FALLBACK_FONT_ID, fontName } from "../model/fonts";
 import { createId } from "../model/id";
@@ -41,6 +41,9 @@ const HEADERS = [
   "description",
   "label_product",
   "quantity",
+  "background_colour",
+  "plate_colour",
+  "text_colour",
 ];
 
 function csvCell(value: string | number | null | undefined): string {
@@ -131,6 +134,9 @@ export function projectToCsv(project: Project, custom: { id: string; name: strin
         tracking_mm: formatMm(group.tracking),
         line_gap_mm: formatMm(group.lineGap),
         label_product: labelProductName(group.product),
+        background_colour: group.backgroundColor,
+        plate_colour: hasPlate(group.product) ? group.plateColor : "",
+        text_colour: group.textColor,
       }),
     );
   }
@@ -390,6 +396,9 @@ function draftGroup(name: string): DraftGroup {
     tracking: 0,
     lineGap: 0.4,
     product: "acrylic",
+    backgroundColor: DEFAULT_BACKGROUND_COLOR,
+    plateColor: DEFAULT_PLATE_COLOR,
+    textColor: DEFAULT_TEXT_COLOR,
     declared: false,
   };
 }
@@ -416,6 +425,7 @@ export function projectFromCsv(text: string, custom: { id: string; name: string 
     return row[column] ?? "";
   };
   const cell = (row: string[], name: string) => raw(row, name).trim();
+  const colourOf = (row: string[], british: string, american: string) => cell(row, british) || cell(row, american);
 
   let name = "Labels";
   let description = "";
@@ -495,6 +505,14 @@ export function projectFromCsv(text: string, custom: { id: string; name: string 
       const lineGap = readNum(cell(row, "line_gap_mm"));
       if (lineGap != null) group.lineGap = lineGap;
       if (cell(row, "label_product")) group.product = labelProductId(cell(row, "label_product"));
+      const background = colourOf(row, "background_colour", "background_color");
+      if (background) group.backgroundColor = normalizeHex(background, group.backgroundColor);
+      const textColour = colourOf(row, "text_colour", "text_color");
+      if (textColour) group.textColor = normalizeHex(textColour, group.textColor);
+      if (hasPlate(group.product)) {
+        const plate = colourOf(row, "plate_colour", "plate_color");
+        if (plate) group.plateColor = normalizeHex(plate, group.plateColor);
+      }
       continue;
     }
     if (kind !== "label") continue;
@@ -568,6 +586,9 @@ export function projectFromCsv(text: string, custom: { id: string; name: string 
       tracking: group.tracking,
       lineGap: group.lineGap,
       product: group.product,
+      backgroundColor: group.backgroundColor,
+      plateColor: group.plateColor,
+      textColor: group.textColor,
     })),
     labels,
     sheet: {

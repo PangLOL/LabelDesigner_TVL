@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { BUILTIN_FONTS, FONT_GROUPS } from "../model/fonts";
 import { clamp, formatMm } from "../model/format";
+import { parseHex } from "../types";
 import type { CustomFont } from "../state/fonts";
 
 interface MmInputProps {
@@ -95,6 +96,68 @@ export function FontSelect({
         </optgroup>
       )}
     </select>
+  );
+}
+
+export function ColourField({
+  caption,
+  label,
+  value,
+  onChange,
+}: {
+  caption: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [text, setText] = useState(value);
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) setText(value);
+  }, [value, focused]);
+
+  return (
+    <label className="colour">
+      <span>{caption}</span>
+      <span className="colour-control">
+        <input
+          type="color"
+          aria-label={label}
+          value={parseHex(value) ?? "#000000"}
+          onChange={(event) => {
+            const next = parseHex(event.target.value);
+            if (next) onChange(next);
+          }}
+        />
+        <input
+          className="field colour-hex"
+          aria-label={`${label} hex`}
+          spellCheck={false}
+          value={focused ? text : value}
+          onFocus={(event) => {
+            setFocused(true);
+            setText(value);
+            event.currentTarget.select();
+          }}
+          onBlur={() => {
+            setFocused(false);
+            const parsed = parseHex(text);
+            if (parsed && parsed !== value) onChange(parsed);
+            setText(parsed ?? value);
+          }}
+          onChange={(event) => {
+            const next = event.target.value;
+            setText(next);
+            const parsed = parseHex(next);
+            if (parsed) onChange(parsed);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+          }}
+        />
+      </span>
+    </label>
   );
 }
 

@@ -1,7 +1,7 @@
 import type { Font } from "opentype.js";
-import { LUBAN_UNITS_PER_MM, isDieCut, type OutlineMode, type SvgUnit } from "../types";
+import { DEFAULT_BACKGROUND_COLOR, DEFAULT_PLATE_COLOR, DEFAULT_TEXT_COLOR, LUBAN_UNITS_PER_MM, hasPlate, isDieCut, type OutlineMode, type SvgUnit } from "../types";
 import { escapeXml, formatMm, formatNum, slug, transformPath } from "../model/format";
-import type { LaidPage, SheetBanner } from "../model/layout";
+import { groupSections, type GroupSection, type LaidPage, type SheetBanner } from "../model/layout";
 import type { ResolvedLabel } from "../model/resolve";
 import type { LabelArt } from "../model/text";
 import { measureText, textPathAt } from "../model/text";
@@ -61,6 +61,16 @@ function calibrationPaths(pageWidth: number, pageHeight: number, font: Font): { 
     lines: `M${formatNum(x)} ${formatNum(y)}H${formatNum(x + length)}M${formatNum(x)} ${formatNum(y - 1.5)}V${formatNum(y + 1.5)}M${formatNum(x + length)} ${formatNum(y - 1.5)}V${formatNum(y + 1.5)}`,
     text: textPathAt(font, caption, x + length / 2 - captionWidth / 2, y - 1.7, 2.3),
   };
+}
+
+function ink(color: string | undefined, fallback: string): string {
+  return escapeXml(color || fallback);
+}
+
+function sectionPath(section: GroupSection): string {
+  const right = formatNum(section.x + section.width);
+  const bottom = formatNum(section.y + section.height);
+  return `M${formatNum(section.x)} ${formatNum(section.y)}H${right}V${bottom}H${formatNum(section.x)}Z`;
 }
 
 function edge(art: LabelArt, x: number, y: number, scale: number, stroke: string, strokeWidth: number, vectorEffect: boolean): string {
@@ -204,6 +214,12 @@ export function renderSheetSvg(
       body.push("</g>");
     }
   }
+  for (const section of groupSections(page, width, { showDimensions: options.showDimensions, showQuantity: options.showQuantity ?? false })) {
+    const background = page.placements.find((item) => item.label.groupId === section.groupId)?.label.backgroundColor;
+    body.push(
+      `<path data-group-section="${escapeXml(section.groupId)}" data-group-name="${escapeXml(section.name)}" data-section-x="${formatNum(section.x)}" data-section-y="${formatNum(section.y)}" data-section-width="${formatNum(section.width)}" data-section-height="${formatNum(section.height)}" fill="${ink(background, DEFAULT_BACKGROUND_COLOR)}" d="${sectionPath(section)}"/>`,
+    );
+  }
   if (dimensionFont) {
     for (const heading of page.headings ?? []) {
       const color = groupSwatch(heading.groupIndex);
@@ -237,7 +253,12 @@ export function renderSheetSvg(
         `<rect class="hit" x="${formatNum(placement.x)}" y="${formatNum(placement.y)}" width="${formatNum(label.width)}" height="${formatNum(label.height)}" fill="transparent"/>`,
       );
     }
-    body.push(`<path d="${transformPath(art.textPath, placement.x, placement.y, 1)}" fill="#000000" fill-rule="nonzero"/>`);
+    if (hasPlate(label.product) && art.borderPath) {
+      body.push(
+        `<path class="label-plate" d="${transformPath(art.borderPath, placement.x, placement.y, 1)}" fill="${ink(label.plateColor, DEFAULT_PLATE_COLOR)}"/>`,
+      );
+    }
+    body.push(`<path d="${transformPath(art.textPath, placement.x, placement.y, 1)}" fill="${ink(label.textColor, DEFAULT_TEXT_COLOR)}" fill-rule="nonzero"/>`);
     if (!isDieCut(label.product)) body.push(edge(art, placement.x, placement.y, 1, "#000000", options.preview ? 1 : 0.12, options.preview));
     if (options.showDimensions && dimensionFont) {
       const dims = dimensionPaths(label, dimensionFont);

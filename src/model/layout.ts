@@ -33,9 +33,20 @@ export interface GroupHeading {
   heightText: string;
   /** How the group is made, printed beside the name. */
   productName: string;
+  groupId: string;
   groupIndex: number;
   x: number;
   y: number;
+}
+
+/** The block of one group on a sheet page: heading through the last label, including dimensions. */
+export interface GroupSection {
+  groupId: string;
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 export interface SheetLine {
@@ -174,6 +185,7 @@ export function paginate(labels: ResolvedLabel[], frame: Frame, options?: { grou
       name: label.groupName,
       heightText: groupHeightText(labels, label.groupId),
       productName: labelProductName(label.product),
+      groupId: label.groupId,
       groupIndex: label.groupIndex,
       x: box.left,
       y,
@@ -230,4 +242,53 @@ export function paginate(labels: ResolvedLabel[], frame: Frame, options?: { grou
 
   if (placements.length || headings.length || pages.length === 0) pages.push({ placements, headings });
   return pages;
+}
+
+/**
+ * One rectangle per group on this page. The width is the content width, inset by the same margin the
+ * labels use, and the height runs from the group heading through the last label and its dimension marks.
+ * Gaps between groups, the page title, and the calibration bar stay outside.
+ */
+export function groupSections(
+  page: LaidPage,
+  pageWidth: number,
+  options: { showDimensions: boolean; showQuantity: boolean },
+): GroupSection[] {
+  const order: string[] = [];
+  const boxes = new Map<string, { name: string; top: number; bottom: number; left: number }>();
+  const touch = (groupId: string, name: string, left: number) => {
+    const existing = boxes.get(groupId);
+    if (existing) {
+      existing.left = Math.min(existing.left, left);
+      return existing;
+    }
+    const created = { name, top: Number.POSITIVE_INFINITY, bottom: Number.NEGATIVE_INFINITY, left };
+    boxes.set(groupId, created);
+    order.push(groupId);
+    return created;
+  };
+
+  for (const heading of page.headings ?? []) {
+    if (!heading.groupId) continue;
+    const box = touch(heading.groupId, heading.name, heading.x);
+    box.top = Math.min(box.top, heading.y);
+    box.bottom = Math.max(box.bottom, heading.y);
+  }
+
+  const dim = options.showDimensions ? DIM_BELOW : 0;
+  const qty = options.showQuantity ? QTY_BAND : 0;
+  for (const placement of page.placements) {
+    const label = placement.label;
+    const box = touch(label.groupId, label.groupName, placement.x);
+    box.top = Math.min(box.top, placement.y - qty);
+    box.bottom = Math.max(box.bottom, placement.y + label.height + dim);
+  }
+
+  return order.flatMap((groupId) => {
+    const box = boxes.get(groupId);
+    if (!box || !Number.isFinite(box.top) || !(box.bottom > box.top)) return [];
+    const width = pageWidth - box.left * 2;
+    if (!(width > 0)) return [];
+    return [{ groupId, name: box.name, x: box.left, y: box.top, width, height: box.bottom - box.top }];
+  });
 }
