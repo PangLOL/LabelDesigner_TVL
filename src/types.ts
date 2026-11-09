@@ -78,6 +78,11 @@ export interface Group {
   plateColor: string;
   /** Colour of the lettering in this group. */
   textColor: string;
+  /**
+   * Colour of this group's sheet guides: dimension lines and text, the quantity, and the group heading.
+   * A missing value keeps the positional guide swatch the sheet used before this colour existed.
+   */
+  dimensionColor: string;
 }
 
 /** One row of lettering. A null size or alignment follows the label and the group. */

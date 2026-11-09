@@ -1,5 +1,6 @@
 import type { Edge, Group, Label, LabelLine, PlateSettings, Project, SheetSettings } from "../types";
 import { DEFAULT_BACKGROUND_COLOR, DEFAULT_PLATE_COLOR, DEFAULT_TEXT_COLOR } from "../types";
+import { groupSwatch } from "../palette";
 import { attachEdgeCross, attachEdgeSpan, cloneComposition, joinLayouts, joinedSize, linesFromText, pieceById, replacePiece, separateParts, singleLayout, withSummary } from "./compose";
 import type { ParsedLabelRow } from "./format";
 import { clamp } from "./format";
@@ -67,6 +68,7 @@ export function makeGroup(project: Project): Group {
     backgroundColor: DEFAULT_BACKGROUND_COLOR,
     plateColor: DEFAULT_PLATE_COLOR,
     textColor: DEFAULT_TEXT_COLOR,
+    dimensionColor: groupSwatch(project.groups.length),
   };
 }
 

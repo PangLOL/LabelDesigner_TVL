@@ -3,6 +3,7 @@ import { parse } from "opentype.js";
 import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 import { LUBAN_UNITS_PER_MM } from "../types";
+import { groupSwatch } from "../palette";
 import { isLabelCsv, projectFromCsv, projectToCsv } from "../export/csv";
 import { buildSvgZip } from "../export/download";
 import { renderLabelSvg, renderPlateSvg, renderSheetSvg } from "../export/svg";
@@ -54,6 +55,7 @@ function box(partial: Partial<ResolvedLabel> & Pick<ResolvedLabel, "text" | "wid
     backgroundColor: partial.backgroundColor ?? "#ffffff",
     plateColor: partial.plateColor ?? "#ffffff",
     textColor: partial.textColor ?? "#000000",
+    dimensionColor: partial.dimensionColor ?? groupSwatch(partial.groupIndex ?? 0),
   };
 }
 
@@ -146,6 +148,7 @@ describe("inheritance", () => {
           backgroundColor: "#fff1cc",
           plateColor: "#1f4b99",
           textColor: "#f4f1ea",
+          dimensionColor: "#c4491d",
         },
       ],
       labels: [grouped, ownHeight, ownFace],
@@ -163,6 +166,7 @@ describe("inheritance", () => {
       backgroundColor: "#fff1cc",
       plateColor: "#1f4b99",
       textColor: "#f4f1ea",
+      dimensionColor: "#c4491d",
     });
     expect(hold).toMatchObject({ height: 18, heightSource: "label", fontSizeSource: "group" });
     expect(fuse).toMatchObject({ height: 12, typefaceId: "inter-semibold", typefaceSource: "label", fontSize: 4.5 });
@@ -450,7 +454,12 @@ describe("project csv", () => {
     expect(opened?.labels[0].pieces[0].lines.map((line) => line.text)).toEqual(["充電座", "座"]);
     expect(opened?.labels[0]?.quantity).toBe(1);
     expect(opened?.groups[0].masterFontSize).toBe(12);
-    expect(opened?.groups[0]).toMatchObject({ backgroundColor: "#ffffff", plateColor: "#ffffff", textColor: "#000000" });
+    expect(opened?.groups[0]).toMatchObject({
+      backgroundColor: "#ffffff",
+      plateColor: "#ffffff",
+      textColor: "#000000",
+      dimensionColor: groupSwatch(0),
+    });
   });
 
   it("round-trips maker colours and leaves the plate blank for die-cut PP", () => {
@@ -459,17 +468,17 @@ describe("project csv", () => {
     project = reducer(project, {
       type: "updateGroup",
       id: acrylicId,
-      patch: { product: "thermal", backgroundColor: "#112233", plateColor: "#abcdef", textColor: "#445566" },
+      patch: { product: "thermal", backgroundColor: "#112233", plateColor: "#abcdef", textColor: "#445566", dimensionColor: "#ffff00" },
     });
     project = reducer(project, { type: "addGroup" });
     const stickerId = project.groups[1].id;
     project = reducer(project, {
       type: "updateGroup",
       id: stickerId,
-      patch: { product: "die-cut-pp", backgroundColor: "#ddeecc", plateColor: "#ff00aa", textColor: "#101010" },
+      patch: { product: "die-cut-pp", backgroundColor: "#ddeecc", plateColor: "#ff00aa", textColor: "#101010", dimensionColor: "#ffffff" },
     });
     const csv = projectToCsv(project);
-    expect(csv).toContain("background_colour,plate_colour,text_colour");
+    expect(csv).toContain("background_colour,plate_colour,text_colour,dimension_colour");
     expect(csv).toContain("#112233");
     expect(csv).toContain("#abcdef");
     expect(csv).toContain("#ddeecc");
@@ -481,22 +490,38 @@ describe("project csv", () => {
       backgroundColor: "#112233",
       plateColor: "#abcdef",
       textColor: "#445566",
+      dimensionColor: "#ffff00",
     });
     expect(restored?.groups[1]).toMatchObject({
       product: "die-cut-pp",
       backgroundColor: "#ddeecc",
       plateColor: "#ffffff",
       textColor: "#101010",
+      dimensionColor: "#ffffff",
     });
 
     const american = [
-      "record,group,label_product,background_color,plate_color,text_color",
-      "group,Power,Layered Acrylic Engraved Label,#abc,#123456,#010203",
-      "group,Marks,Die-cut PP Sticker,#445566,#ff00aa,#0a0a0a",
+      "record,group,label_product,background_color,plate_color,text_color,dimension_color",
+      "group,Power,Layered Acrylic Engraved Label,#abc,#123456,#010203,#ff0",
+      "group,Marks,Die-cut PP Sticker,#445566,#ff00aa,#0a0a0a,",
     ].join("\n");
     const opened = projectFromCsv(american);
-    expect(opened?.groups[0]).toMatchObject({ backgroundColor: "#aabbcc", plateColor: "#123456", textColor: "#010203" });
-    expect(opened?.groups[1]).toMatchObject({ product: "die-cut-pp", backgroundColor: "#445566", plateColor: "#ffffff", textColor: "#0a0a0a" });
+    expect(opened?.groups[0]).toMatchObject({ backgroundColor: "#aabbcc", plateColor: "#123456", textColor: "#010203", dimensionColor: "#ffff00" });
+    expect(opened?.groups[1]).toMatchObject({
+      product: "die-cut-pp",
+      backgroundColor: "#445566",
+      plateColor: "#ffffff",
+      textColor: "#0a0a0a",
+      dimensionColor: groupSwatch(1),
+    });
+
+    const british = [
+      "record,group,dimension_colour",
+      "group,One,#00e5ff",
+      "group,Two,green",
+    ].join("\n");
+    const spelled = projectFromCsv(british);
+    expect(spelled?.groups.map((group) => group.dimensionColor)).toEqual(["#00e5ff", groupSwatch(1)]);
   });
 
   it("opens the FSD sheet, which has no colour columns, as black lettering on white", () => {
@@ -507,6 +532,17 @@ describe("project csv", () => {
       ["Group 1", "acrylic", "#ffffff", "#ffffff", "#000000"],
       ["Group 3", "die-cut-pp", "#ffffff", "#ffffff", "#000000"],
     ]);
+    expect(opened?.groups.map((group) => group.dimensionColor)).toEqual([groupSwatch(0), groupSwatch(1)]);
+    const legacyJson = sanitizeProject({
+      version: 1,
+      name: "Old",
+      groups: [
+        { id: "a", name: "One" },
+        { id: "b", name: "Two" },
+      ],
+      labels: [],
+    });
+    expect(legacyJson?.groups.map((group) => group.dimensionColor)).toEqual([groupSwatch(0), groupSwatch(1)]);
     expect(opened?.labels).toHaveLength(7);
     const saved = sanitizeProject(JSON.parse(JSON.stringify(opened)));
     expect(saved?.groups[0].backgroundColor).toBe("#ffffff");
@@ -514,12 +550,12 @@ describe("project csv", () => {
       ...saved,
       groups: saved?.groups.map((group, index) =>
         index === 0
-          ? { ...group, backgroundColor: "red", plateColor: "#abc", textColor: "#445566" }
-          : { ...group, backgroundColor: "#e7f2ea", plateColor: "#ff00aa", textColor: "navy" },
+          ? { ...group, backgroundColor: "red", plateColor: "#abc", textColor: "#445566", dimensionColor: "#ff0" }
+          : { ...group, backgroundColor: "#e7f2ea", plateColor: "#ff00aa", textColor: "navy", dimensionColor: "yellow" },
       ),
     });
-    expect(coloured?.groups[0]).toMatchObject({ backgroundColor: "#ffffff", plateColor: "#aabbcc", textColor: "#445566" });
-    expect(coloured?.groups[1]).toMatchObject({ backgroundColor: "#e7f2ea", plateColor: "#ff00aa", textColor: "#000000" });
+    expect(coloured?.groups[0]).toMatchObject({ backgroundColor: "#ffffff", plateColor: "#aabbcc", textColor: "#445566", dimensionColor: "#ffff00" });
+    expect(coloured?.groups[1]).toMatchObject({ backgroundColor: "#e7f2ea", plateColor: "#ff00aa", textColor: "#000000", dimensionColor: groupSwatch(1) });
   });
 });
 
@@ -684,6 +720,81 @@ describe("maker colours", () => {
     expect(stickerInk).not.toContain("label-plate");
     expect(stickerInk).toContain('fill="#ffffff"');
     expect(stickerInk).not.toContain('fill="#ff0000"');
+  });
+
+  it("paints dimension marks, quantity, and the heading in the group's dimension colour", () => {
+    const acrylic = box({
+      id: "lock",
+      text: "ON",
+      width: 40,
+      height: 16,
+      fontSize: 8,
+      quantity: 2,
+      groupId: "g1",
+      groupName: "Group 1",
+      groupIndex: 0,
+      product: "acrylic",
+      backgroundColor: "#ff0000",
+      plateColor: "#ffffff",
+      textColor: "#ff0000",
+      dimensionColor: "#ffff00",
+    });
+    const sticker = box({
+      id: "kpa",
+      text: "280",
+      width: 40,
+      height: 16,
+      fontSize: 8,
+      quantity: 2,
+      groupId: "g3",
+      groupName: "Group 3",
+      groupIndex: 1,
+      product: "die-cut-pp",
+      backgroundColor: "#000000",
+      plateColor: "#ff00aa",
+      textColor: "#ffffff",
+      dimensionColor: "#ffffff",
+    });
+    const frame = { width: 210, height: 297, margin: 14, gap: 6, showDimensions: true, bottomInset: 16 };
+    const pages = paginate([acrylic, sticker], frame, { groupRows: true, showQuantity: true });
+    const arts = new Map([
+      [acrylic.id, buildLabelArt(inter, acrylic)],
+      [sticker.id, buildLabelArt(inter, sticker)],
+    ]);
+    const svg = renderSheetSvg(pages[0], 210, 297, arts, mono, {
+      preview: false,
+      showDimensions: true,
+      showCalibration: true,
+      showQuantity: true,
+    });
+    const heading = svg.slice(svg.indexOf('data-group-heading="Group 1"'), svg.indexOf('data-group-heading="Group 3"'));
+    const redGuides = svg.slice(svg.indexOf('data-label-id="lock"'), svg.indexOf('data-label-id="kpa"'));
+    const blackGuides = svg.slice(svg.indexOf('data-label-id="kpa"'));
+    expect(heading).toContain('fill="#ffff00"');
+    expect(heading).toContain('stroke="#ffff00"');
+    expect(heading).not.toContain(groupSwatch(0));
+    expect(redGuides).toContain('data-dimensions="lock"');
+    expect(redGuides).toContain('stroke="#ffff00"');
+    expect(redGuides).toContain('fill="#ffff00"');
+    expect(redGuides).not.toContain(groupSwatch(0));
+    expect(blackGuides).toContain('data-dimensions="kpa"');
+    expect(blackGuides).toContain('stroke="#ffffff"');
+    expect(blackGuides).toContain('data-label-qty="2"');
+    expect(blackGuides).not.toContain(groupSwatch(1));
+    expect(svg).toContain('stroke="#1b1914"');
+
+    const plate = renderPlateSvg(pages[0], 320, 350, "mm", true, "cut", arts, { preview: false, part: "both" });
+    const cut = renderLabelSvg(acrylic, arts.get(acrylic.id)!, "mm", true, "cut", "outline");
+    const engrave = renderLabelSvg(acrylic, arts.get(acrylic.id)!, "mm", true, "engrave", "text");
+    expect(plate).not.toContain("#ffff00");
+    expect(plate).not.toContain("data-dimensions");
+    expect(plate).toContain('stroke="#ff0000"');
+    expect(plate).toContain('fill="#000000"');
+    expect(cut).toContain('stroke="#ff0000"');
+    expect(cut).not.toContain("#ffff00");
+    expect(engrave).toContain('fill="#000000"');
+    expect(engrave).not.toContain("#ffff00");
+    expect(engrave).not.toContain("#ff0000");
   });
 });
 

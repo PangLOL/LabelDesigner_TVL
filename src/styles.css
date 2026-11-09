@@ -201,10 +201,10 @@ h2 { margin: 0; font-size: 14px; font-weight: 500; }
   margin-bottom: 8px;
 }
 .colours {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
   gap: 14px 18px;
-  align-items: flex-end;
+  align-items: end;
   margin: 4px 0 2px;
 }
 .colour {
@@ -228,7 +228,11 @@ h2 { margin: 0; font-size: 14px; font-weight: 500; }
   background: var(--white);
   cursor: pointer;
 }
-.colour-hex { width: 92px; }
+.colour-control .colour-hex {
+  width: auto;
+  min-width: 0;
+  flex: 1;
+}
 .field-label, .preview-tools > label, .spacing-grid > label, .bulk form label, .bulk > label {
   display: flex;
   flex-direction: column;

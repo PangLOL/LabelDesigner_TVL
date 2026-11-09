@@ -67,6 +67,11 @@ function ink(color: string | undefined, fallback: string): string {
   return escapeXml(color || fallback);
 }
 
+/** Sheet guides for one group. The page title and the calibration bar stay ink, because they sit on the paper, not on a group. */
+function guideColor(color: string | undefined, groupIndex: number): string {
+  return ink(color, groupSwatch(groupIndex));
+}
+
 function sectionPath(section: GroupSection): string {
   const right = formatNum(section.x + section.width);
   const bottom = formatNum(section.y + section.height);
@@ -222,7 +227,8 @@ export function renderSheetSvg(
   }
   if (dimensionFont) {
     for (const heading of page.headings ?? []) {
-      const color = groupSwatch(heading.groupIndex);
+      const sample = page.placements.find((item) => item.label.groupId === heading.groupId)?.label;
+      const color = guideColor(sample?.dimensionColor, sample?.groupIndex ?? heading.groupIndex);
       const caption = `${heading.name}  ·  ${heading.productName}  ·  ${heading.heightText}`;
       const baseline = heading.y + 4.4;
       body.push(`<g data-group-heading="${escapeXml(heading.name)}" data-group-product="${escapeXml(heading.productName)}">`);
@@ -239,7 +245,7 @@ export function renderSheetSvg(
     if (!art) continue;
     const label = placement.label;
     const selected = options.selected?.has(label.id) ?? false;
-    const color = groupSwatch(label.groupIndex);
+    const color = guideColor(label.dimensionColor, label.groupIndex);
     body.push(`<g data-label-id="${escapeXml(label.id)}"${selected ? ` class="is-selected"` : ""}>`);
     const quantity = label.quantity ?? 1;
     body.push(`<title>${escapeXml(`${label.text || "Empty"} — ${formatMm(label.width)} × ${formatMm(label.height)} mm · qty ${quantity}`)}</title>`);
@@ -262,10 +268,12 @@ export function renderSheetSvg(
     if (!isDieCut(label.product)) body.push(edge(art, placement.x, placement.y, 1, "#000000", options.preview ? 1 : 0.12, options.preview));
     if (options.showDimensions && dimensionFont) {
       const dims = dimensionPaths(label, dimensionFont);
+      body.push(`<g data-dimensions="${escapeXml(label.id)}">`);
       body.push(
         `<path d="${transformPath(dims.lines, placement.x, placement.y, 1)}" fill="none" stroke="${color}" stroke-width="${options.preview ? 1 : 0.12}"${options.preview ? ` vector-effect="non-scaling-stroke"` : ""} stroke-linecap="square"/>`,
       );
       body.push(`<path d="${transformPath(dims.text, placement.x, placement.y, 1)}" fill="${color}"/>`);
+      body.push("</g>");
     }
     if (selected && isDieCut(label.product)) {
       body.push(
